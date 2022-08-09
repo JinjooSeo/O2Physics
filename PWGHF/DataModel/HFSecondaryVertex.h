@@ -96,6 +96,7 @@ DECLARE_SOA_INDEX_COLUMN_FULL(Index0, index0, int, Tracks, "_0"); //! Index to f
 DECLARE_SOA_INDEX_COLUMN_FULL(Index1, index1, int, Tracks, "_1"); //! Index to second prong
 DECLARE_SOA_INDEX_COLUMN_FULL(Index2, index2, int, Tracks, "_2"); //! Index to third prong
 DECLARE_SOA_INDEX_COLUMN(V0, v0);                                 //! Index to V0 prong
+DECLARE_SOA_INDEX_COLUMN(Cascade, cascade);                       //! Index to cascade prong
 DECLARE_SOA_COLUMN(HFflag, hfflag, uint8_t);                      //!
 
 DECLARE_SOA_COLUMN(D0ToKPiFlag, d0ToKPiFlag, uint8_t);       //!
@@ -128,6 +129,13 @@ DECLARE_SOA_TABLE(Hf3Prongs, "AOD", "HF3PRONG", //! Table for HF 3 prong candida
                   hf_track_index::Index2Id,
                   hf_track_index::HFflag);
 using Hf3Prong = Hf3Prongs::iterator;
+
+DECLARE_SOA_TABLE(HfCascades3Prongs, "AOD", "HFCASCADE3PRONG", //! Table for HF candidates with a 3 prong candidates
+                  o2::soa::Index<>,
+                  hf_track_index::Index0Id,
+                  hf_track_index::Index1Id,
+                  hf_track_index::CascadeId);
+using HfCascades3Prong = HfCascades3Prongs::iterator;
 
 namespace hf_track_index
 {

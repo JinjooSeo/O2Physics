@@ -2086,21 +2086,11 @@ struct HfTrackIndexSkimsCreator {
 
 //________________________________________________________________________________________________________________________
 
-/// Pre-selection of cascade secondary vertices
-/// It will produce in any case a Hf2Prongs object, but mixing a V0
-/// with a track, instead of 2 tracks
-
-/// to run: o2-analysis-weak-decay-indices --aod-file AO2D.root -b | o2-analysis-lambdakzerobuilder -b |
-///         o2-analysis-trackextension -b | o2-analysis-hf-track-index-skims-creator -b
-
 struct HfTrackIndexSkimsCreatorCascades {
   Produces<aod::HfCascades> rowTrackIndexCasc;
 
   // whether to do or not validation plots
   Configurable<bool> doValPlots{"doValPlots", true, "fill histograms"};
-
-  // event selection
-  // Configurable<int> triggerindex{"triggerindex", -1, "trigger index"};
 
   // vertexing parameters
   Configurable<double> bZ{"bZ", 5., "magnetic field"};
@@ -2126,10 +2116,6 @@ struct HfTrackIndexSkimsCreatorCascades {
   Configurable<double> etaMax{"etaMax", 1.1, "max. pseudorapidity V0 daughters"};
   Configurable<double> ptMin{"ptMin", 0.05, "min. pT V0 daughters"};
 
-  // bachelor cuts
-  //  Configurable<float> dcabachtopv{"dcabachtopv", .1, "DCA Bach To PV"};
-  //  Configurable<double> ptminbach{"ptminbach", -1., "min. track pT bachelor"};
-
   // v0 cuts
   Configurable<double> cosPAV0{"cosPAV0", .995, "CosPA V0"};                 // as in the task that create the V0s
   Configurable<double> dcaXYNegToPV{"dcaXYNegToPV", .1, "DCA_XY Neg To PV"}; // check: in HF Run 2, it was 0 at filtering
@@ -2139,7 +2125,6 @@ struct HfTrackIndexSkimsCreatorCascades {
   // cascade cuts
   Configurable<double> cutCascPtCandMin{"cutCascPtCandMin", -1., "min. pT of the cascade candidate"};              // PbPb 2018: use 1
   Configurable<double> cutCascInvMassLc{"cutCascInvMassLc", 1., "Lc candidate invariant mass difference wrt PDG"}; // for PbPb 2018: use 0.2
-  // Configurable<double> cutCascDCADaughters{"cutCascDCADaughters", .1, "DCA between V0 and bachelor in cascade"};
 
   // for debugging
 #ifdef MY_DEBUG
@@ -2173,7 +2158,6 @@ struct HfTrackIndexSkimsCreatorCascades {
 
   void process(SelectedCollisions::iterator const& collision,
                aod::BCs const& bcs,
-               // soa::Filtered<aod::V0Datas> const& V0s,
                aod::V0Datas const& V0s,
                MyTracks const& tracks
 #ifdef MY_DEBUG
@@ -2356,6 +2340,121 @@ struct HfTrackIndexSkimsCreatorCascades {
   }   // process
 };
 
+struct HfTrackIndexSkimsCreatorCascades3Prong {
+  Produces<aod::HfCascades3Prong> rowTrackIndexCasc3Prong;
+
+  // whether to do or not validation plots
+  Configurable<bool> doValPlots{"doValPlots", true, "fill histograms"};
+
+  // vertexing parameters
+  Configurable<double> bZ{"bZ", 5., "magnetic field"};
+  Configurable<bool> propDCA{"propDCA", true, "create tracks version propagated to PCA"};
+  Configurable<double> maxR{"maxR", 200., "reject PCA's above this radius"};
+  Configurable<double> maxDZIni{"maxDZIni", 4., "reject (if>0) PCA candidate if tracks DZ exceeds threshold"};
+  Configurable<double> minParamChange{"minParamChange", 1.e-3, "stop iterations if largest change of any X is smaller than this"};
+  Configurable<double> minRelChi2Change{"minRelChi2Change", 0.9, "stop iterations if chi2/chi2old > this"};
+  Configurable<bool> UseAbsDCA{"UseAbsDCA", true, "Use Abs DCAs"};
+
+
+  // histograms
+  HistogramRegistry registry{
+    "registry",
+    {{"hMass3", "3-prong candidates;inv. mass (#Xi #pi #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{100, 2., 3.}}}}}};
+
+  double massXi = RecoDecay::getMassPDG(kXiMinus);
+  double massPi = RecoDecay::getMassPDG(kPiPlus);
+  double massXicPlus = RecoDecay::getMassPDG(pdg::Code::kXiCPlus);
+
+  Filter filterSelectCollisions = (aod::hf_selcollision::whyRejectColl == 0);
+
+  using SelectedCollisions = soa::Filtered<soa::Join<aod::Collisions, aod::HFSelCollision>>;
+  using FullTracksExt = soa::Join<aod::FullTracks, aod::TracksDCA>;
+
+  void process(SelectedCollisions::iterator const& collision,
+               aod::BCs const& bcs,
+               aod::CascDataExt const& cascades,
+               aod::V0sLinked const&, aod::V0Datas const&,
+               MyTracks const& tracks
+               ) 
+  {
+    // Define o2 fitter, 3-prong
+    o2::vertexing::DCAFitterN<2> fitter2Pi;
+    fitter2Pi.setBz(bZ);
+    fitter2Pi.setPropagateToPCA(propDCA);
+    fitter2Pi.setMaxR(maxR);
+    fitter2Pi.setMinParamChange(minParamChange);
+    fitter2Pi.setMinRelChi2Change(minRelChi2Change);
+    fitter2Pi.setUseAbsDCA(UseAbsDCA);
+
+    // first loop over positive tracks
+    for (auto trackPos1 = tracks.begin(); trackPos1 != tracks.end(); ++trackPos1) {
+      if (trackPos1.signed1Pt() < 0) {
+        continue;
+      }
+
+      if (tracks.size() < 2) {
+            continue;
+      }
+      
+      if (!TESTBIT(trackPos1.isSelProng(), CandidateType::Cand3Prong)) {
+        continue;
+      }
+      
+      auto trackParVarPos1 = getTrackParCov(trackPos1);
+     
+      // second loop over positive tracks
+      for (auto trackPos2 = tracks.begin(); trackPos2 != tracks.end(); ++trackPos2) {
+        if (trackPos2.signed1Pt() < 0) {
+          continue;
+        }
+
+
+        
+       
+        if (!TESTBIT(trackPos2.isSelProng(), CandidateType::Cand3Prong)) {
+          continue;
+        }
+
+        auto trackParVarPos2 = getTrackParCov(trackPos2);
+
+        for (auto& casc : cascades) {
+          auto v0 = casc.v0_as<o2::aod::V0sLinked>();
+          if (!(v0.has_v0Data())) {
+            continue; //skip those cascades for which V0 doesn't exist
+          }
+
+          std::array<float, 3> pVec1 = {0., 0., 0.};
+          std::array<float, 3> pVec2 = {0., 0., 0.};
+          std::array<float, 3> pVecCascade = {casc.px(), casc.py(), casc.pz()};
+
+          if(fitter2Pi.process(trackParVarPos1, trackParVarPos2) == 0 ) {
+            continue;
+          }
+
+          fitter2Pi.getTrack(0).getPxPyPzGlo(pVec1); // take the momentum at the Lc vertex
+          fitter2Pi.getTrack(1).getPxPyPzGlo(pVec2);
+          
+
+          // invariant mass
+          // re-calculate invariant masses with updated momenta, to fill the histogram
+          double massXi = casc.mXi();
+          massXicPlus = RecoDecay::m(array{pVec1, pVecCascade, pVec2}, array{massPi, massXi , massPi});
+
+          // fill table row
+          rowTrackIndexCasc3Prong(trackPos1.globalIndex(),
+                            trackPos2.globalIndex(),
+                            casc.globalIndex());
+          // fill histograms
+          if (doValPlots) {
+            registry.fill(HIST("hMass3"), massXicPlus);
+          }
+
+        } // loop over cascade
+      } // loop over tracks2
+    } // loop over track1
+  }   // process
+};
+
 //________________________________________________________________________________________________________________________
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
@@ -2374,6 +2473,7 @@ WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
   const bool doCascades = cfgc.options().get<bool>("doCascades");
   if (doCascades) {
     workflow.push_back(adaptAnalysisTask<HfTrackIndexSkimsCreatorCascades>(cfgc));
+    workflow.push_back(adaptAnalysisTask<HfTrackIndexSkimsCreatorCascades3Prong>(cfgc));
   }
 
   return workflow;
