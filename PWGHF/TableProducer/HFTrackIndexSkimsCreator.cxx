@@ -2091,15 +2091,17 @@ struct HfTrackIndexSkimsCreatorCascades {
 
   // whether to do or not validation plots
   Configurable<bool> doValPlots{"doValPlots", true, "fill histograms"};
+  Configurable<int> do3prong{"do3prong", 0, "do 3 prong cascade"};
+  Configurable<bool> doPvRefit{"doPvRefit", false, "do PV refit excluding the considered track"};
 
   // vertexing parameters
-  Configurable<double> bZ{"bZ", 5., "magnetic field"};
-  Configurable<bool> propDCA{"propDCA", true, "create tracks version propagated to PCA"};
-  Configurable<double> maxR{"maxR", 200., "reject PCA's above this radius"};
+  Configurable<double> bz{"bz", 5., "magnetic field kG"};
+  Configurable<bool> propToDCA{"propToDCA", true, "create tracks version propagated to PCA"};
+  Configurable<bool> useAbsDCA{"useAbsDCA", true, "Minimise abs. distance rather than chi2"};
+  Configurable<double> maxRad{"maxRad", 200., "reject PCA's above this radius"};
   Configurable<double> maxDZIni{"maxDZIni", 4., "reject (if>0) PCA candidate if tracks DZ exceeds threshold"};
   Configurable<double> minParamChange{"minParamChange", 1.e-3, "stop iterations if largest change of any X is smaller than this"};
   Configurable<double> minRelChi2Change{"minRelChi2Change", 0.9, "stop iterations if chi2/chi2old > this"};
-  Configurable<bool> UseAbsDCA{"UseAbsDCA", true, "Use Abs DCAs"};
 
   // quality cut
   Configurable<bool> doCutQuality{"doCutQuality", true, "apply quality cuts"};
@@ -2126,68 +2128,66 @@ struct HfTrackIndexSkimsCreatorCascades {
   Configurable<double> cutCascPtCandMin{"cutCascPtCandMin", -1., "min. pT of the cascade candidate"};              // PbPb 2018: use 1
   Configurable<double> cutCascInvMassLc{"cutCascInvMassLc", 1., "Lc candidate invariant mass difference wrt PDG"}; // for PbPb 2018: use 0.2
 
-  // for debugging
-#ifdef MY_DEBUG
-  Configurable<std::vector<int>> indexK0Spos{"indexK0Spos", {729, 2866, 4754, 5457, 6891, 7824, 9243, 9810}, "indices of K0S positive daughters, for debug"};
-  Configurable<std::vector<int>> indexK0Sneg{"indexK0Sneg", {730, 2867, 4755, 5458, 6892, 7825, 9244, 9811}, "indices of K0S negative daughters, for debug"};
-  Configurable<std::vector<int>> indexProton{"indexProton", {717, 2810, 4393, 5442, 6769, 7793, 9002, 9789}, "indices of protons, for debug"};
-#endif
-
   // histograms
   HistogramRegistry registry{
     "registry",
+     // 2-prong histograms
     {{"hVtx2ProngX", "2-prong candidates;#it{x}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx2ProngY", "2-prong candidates;#it{y}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx2ProngZ", "2-prong candidates;#it{z}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -20., 20.}}}},
-     {"hMass2", "2-prong candidates;inv. mass (K0s p) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{500, 0., 5.}}}}}};
-
-  // using MyTracks = aod::BigTracksMC;
-  // Partition<MyTracks> selectedTracks = aod::hf_seltrack::isSelProng >= 4;
-  //  using SelectedV0s = soa::Filtered<aod::V0Datas>;
+     {"hMassLcToK0sPi", "2-prong candidates;inv. mass (K0s p) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{500, 0., 5.}}}},
+     // 3-prong histograms
+     {"hVtx3ProngX", "3-prong candidates;#it{x}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
+     {"hVtx3ProngY", "3-prong candidates;#it{y}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
+     {"hVtx3ProngZ", "3-prong candidates;#it{z}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -20., 20.}}}},
+     {"hMassXicToXiPiPi", "3-prong candidates;inv. mass (#Xi #pi #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{100, 2., 3.}}}}}};
 
   double massP = RecoDecay::getMassPDG(kProton);
   double massK0s = RecoDecay::getMassPDG(kK0Short);
   double massPi = RecoDecay::getMassPDG(kPiPlus);
   double massLc = RecoDecay::getMassPDG(pdg::Code::kLambdaCPlus);
+  double massXi = RecoDecay::getMassPDG(kXiMinus);
+  double massXicPlus = RecoDecay::getMassPDG(pdg::Code::kXiCPlus);
   double mass2K0sP{0.}; // WHY HERE?
 
   Filter filterSelectCollisions = (aod::hf_selcollision::whyRejectColl == 0);
+  Filter filterSelectTracks = aod::hf_seltrack::isSelProng > 0;
 
   using SelectedCollisions = soa::Filtered<soa::Join<aod::Collisions, aod::HFSelCollision>>;
-  using FullTracksExt = soa::Join<aod::FullTracks, aod::TracksDCA>;
+  using SelectedTracks = soa::Filtered<soa::Join<aod::BigTracks, aod::TracksDCA, aod::HFSelTrack, aod::HfPvRefitTrack>>;
 
   void process(SelectedCollisions::iterator const& collision,
                aod::BCs const& bcs,
                aod::V0Datas const& V0s,
-               MyTracks const& tracks
-#ifdef MY_DEBUG
-               ,
-               aod::McParticles& mcParticles
-#endif
+               aod::V0sLinked const&,
+               aod::CascData const& cascades,
+               SelectedTracks const& tracks
                ) // TODO: I am now assuming that the V0s are already filtered with my cuts (David's work to come)
   {
+    // 2-prong vertex fitter
+      o2::vertexing::DCAFitterN<2> df2;
+      df2.setBz(bz);
+      df2.setPropagateToPCA(propToDCA);
+      df2.setMaxR(maxRad);
+      df2.setMaxDZIni(maxDZIni);
+      df2.setMinParamChange(minParamChange);
+      df2.setMinRelChi2Change(minRelChi2Change);
+      df2.setUseAbsDCA(useAbsDCA);
 
-    // Define o2 fitter, 2-prong
-    o2::vertexing::DCAFitterN<2> fitter;
-    fitter.setBz(bZ);
-    fitter.setPropagateToPCA(propDCA);
-    fitter.setMaxR(maxR);
-    fitter.setMinParamChange(minParamChange);
-    fitter.setMinRelChi2Change(minRelChi2Change);
-    // fitter.setMaxDZIni(1e9); // used in cascadeproducer.cxx, but not for the 2 prongs
-    // fitter.setMaxChi2(1e9);  // used in cascadeproducer.cxx, but not for the 2 prongs
-    fitter.setUseAbsDCA(UseAbsDCA);
+      // 3-prong vertex fitter
+      // FIXME: Modify the DCAFitter with cascade
+      o2::vertexing::DCAFitterN<2> df3;
+      df3.setBz(bz);
+      df3.setPropagateToPCA(propToDCA);
+      df3.setMaxR(maxRad);
+      df3.setMaxDZIni(maxDZIni);
+      df3.setMinParamChange(minParamChange);
+      df3.setMinRelChi2Change(minRelChi2Change);
+      df3.setUseAbsDCA(useAbsDCA);
 
     // fist we loop over the bachelor candidate
-
     // for (const auto& bach : selectedTracks) {
     for (const auto& bach : tracks) {
-
-      MY_DEBUG_MSG(1, printf("\n"); LOG(info) << "Bachelor loop");
-#ifdef MY_DEBUG
-      auto indexBach = bach.mcParticleId();
-      bool isProtonFromLc = isProtonFromLcFunc(indexBach, indexProton);
-#endif
       // selections on the bachelor
       // pT cut
       if (bach.isSelProng() < 4) {
@@ -2214,60 +2214,34 @@ struct HfTrackIndexSkimsCreatorCascades {
         // selections on the V0 daughters
         const auto& trackV0DaughPos = v0.posTrack_as<MyTracks>();
         const auto& trackV0DaughNeg = v0.negTrack_as<MyTracks>();
-#ifdef MY_DEBUG
-        auto indexV0DaughPos = trackV0DaughPos.mcParticleId();
-        auto indexV0DaughNeg = trackV0DaughNeg.mcParticleId();
-        bool isK0SfromLc = isK0SfromLcFunc(indexV0DaughPos, indexV0DaughNeg, indexK0Spos, indexK0Sneg);
-
-        bool isLc = isLcK0SpFunc(indexBach, indexV0DaughPos, indexV0DaughNeg, indexProton, indexK0Spos, indexK0Sneg);
-#endif
-        MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S from Lc found, trackV0DaughPos --> " << indexV0DaughPos << ", trackV0DaughNeg --> " << indexV0DaughNeg);
-
-        MY_DEBUG_MSG(isK0SfromLc && isProtonFromLc,
-                     LOG(info) << "ACCEPTED!!!";
-                     LOG(info) << "proton belonging to a Lc found: label --> " << indexBach;
-                     LOG(info) << "K0S belonging to a Lc found: trackV0DaughPos --> " << indexV0DaughPos << ", trackV0DaughNeg --> " << indexV0DaughNeg);
-
-        MY_DEBUG_MSG(isLc, LOG(info) << "Combination of K0S and p which correspond to a Lc found!");
 
         if (TPCRefitV0Daugh) {
           if (!(trackV0DaughPos.trackType() & o2::aod::track::TPCrefit) ||
               !(trackV0DaughNeg.trackType() & o2::aod::track::TPCrefit)) {
-            MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to TPCrefit");
             continue;
           }
         }
         if (trackV0DaughPos.tpcNClsCrossedRows() < minCrossedRowsV0Daugh ||
             trackV0DaughNeg.tpcNClsCrossedRows() < minCrossedRowsV0Daugh) {
-          MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to minCrossedRows");
           continue;
         }
-        //
-        // if (trackV0DaughPos.dcaXY() < dcaXYPosToPV ||   // to the filters?
-        //     trackV0DaughNeg.dcaXY() < dcaXYNegToPV) {
-        //   continue;
-        // }
-        //
+
         if (trackV0DaughPos.pt() < ptMin || // to the filters? I can't for now, it is not in the tables
             trackV0DaughNeg.pt() < ptMin) {
-          MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to minPt --> pos " << trackV0DaughPos.pt() << ", neg " << trackV0DaughNeg.pt() << " (cut " << ptMin << ")");
           continue;
         }
         if (std::abs(trackV0DaughPos.eta()) > etaMax || // to the filters? I can't for now, it is not in the tables
             std::abs(trackV0DaughNeg.eta()) > etaMax) {
-          MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to eta --> pos " << trackV0DaughPos.eta() << ", neg " << trackV0DaughNeg.eta() << " (cut " << etaMax << ")");
           continue;
         }
 
         // V0 invariant mass selection
         if (std::abs(v0.mK0Short() - massK0s) > cutInvMassV0) {
-          MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to invMass --> " << v0.mK0Short() - massK0s << " (cut " << cutInvMassV0 << ")");
           continue; // should go to the filter, but since it is a dynamic column, I cannot use it there
         }
 
         // V0 cosPointingAngle selection
         if (v0.v0cosPA(collision.posX(), collision.posY(), collision.posZ()) < cosPAV0) {
-          MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "K0S with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg << ": rejected due to cosPA --> " << v0.v0cosPA(collision.posX(), collision.posY(), collision.posZ()) << " (cut " << cosPAV0 << ")");
           continue;
         }
 
@@ -2277,11 +2251,8 @@ struct HfTrackIndexSkimsCreatorCascades {
         // TODO: but one should better check that the value here and after the fitter do not change significantly!!!
         mass2K0sP = RecoDecay::m(array{array{bach.px(), bach.py(), bach.pz()}, momentumV0}, array{massP, massK0s});
         if ((cutCascInvMassLc >= 0.) && (std::abs(mass2K0sP - massLc) > cutCascInvMassLc)) {
-          MY_DEBUG_MSG(isK0SfromLc && isProtonFromLc, LOG(info) << "True Lc from proton " << indexBach << " and K0S pos " << indexV0DaughPos << " and neg " << indexV0DaughNeg << " rejected due to invMass cut: " << mass2K0sP << ", mass Lc " << massLc << " (cut " << cutCascInvMassLc << ")");
           continue;
         }
-
-        MY_DEBUG_MSG(isK0SfromLc, LOG(info) << "KEPT! K0S from Lc with daughters " << indexV0DaughPos << " and " << indexV0DaughNeg);
 
         auto trackParCovV0DaughPos = getTrackParCov(trackV0DaughPos);
         trackParCovV0DaughPos.propagateTo(v0.posX(), bZ); // propagate the track to the X closest to the V0 vertex
@@ -2296,8 +2267,6 @@ struct HfTrackIndexSkimsCreatorCascades {
 
         // now we find the DCA between the V0 and the bachelor, for the cascade
         int nCand2 = fitter.process(trackV0, trackBach);
-        MY_DEBUG_MSG(isK0SfromLc && isProtonFromLc, LOG(info) << "Fitter result = " << nCand2 << " proton = " << indexBach << " and K0S pos " << indexV0DaughPos << " and neg " << indexV0DaughNeg);
-        MY_DEBUG_MSG(isLc, LOG(info) << "Fitter result for true Lc = " << nCand2);
         if (nCand2 == 0) {
           continue;
         }
@@ -2308,7 +2277,6 @@ struct HfTrackIndexSkimsCreatorCascades {
         // cascade candidate pT cut
         auto ptCascCand = RecoDecay::pt(pVecBach, pVecV0);
         if (ptCascCand < cutCascPtCandMin) {
-          MY_DEBUG_MSG(isK0SfromLc && isProtonFromLc, LOG(info) << "True Lc from proton " << indexBach << " and K0S pos " << indexV0DaughPos << " and neg " << indexV0DaughNeg << " rejected due to pt cut: " << ptCascCand << " (cut " << cutCascPtCandMin << ")");
           continue;
         }
 
@@ -2331,127 +2299,74 @@ struct HfTrackIndexSkimsCreatorCascades {
           registry.fill(HIST("hVtx2ProngX"), posCasc[0]);
           registry.fill(HIST("hVtx2ProngY"), posCasc[1]);
           registry.fill(HIST("hVtx2ProngZ"), posCasc[2]);
-          registry.fill(HIST("hMass2"), mass2K0sP);
+          registry.fill(HIST("hMassLcToK0sPi"), mass2K0sP);
         }
-
       } // loop over V0s
-
     } // loop over tracks
-  }   // process
-};
 
-struct HfTrackIndexSkimsCreatorCascades3Prong {
-  Produces<aod::HfCascades3Prong> rowTrackIndexCasc3Prong;
-
-  // whether to do or not validation plots
-  Configurable<bool> doValPlots{"doValPlots", true, "fill histograms"};
-
-  // vertexing parameters
-  Configurable<double> bZ{"bZ", 5., "magnetic field"};
-  Configurable<bool> propDCA{"propDCA", true, "create tracks version propagated to PCA"};
-  Configurable<double> maxR{"maxR", 200., "reject PCA's above this radius"};
-  Configurable<double> maxDZIni{"maxDZIni", 4., "reject (if>0) PCA candidate if tracks DZ exceeds threshold"};
-  Configurable<double> minParamChange{"minParamChange", 1.e-3, "stop iterations if largest change of any X is smaller than this"};
-  Configurable<double> minRelChi2Change{"minRelChi2Change", 0.9, "stop iterations if chi2/chi2old > this"};
-  Configurable<bool> UseAbsDCA{"UseAbsDCA", true, "Use Abs DCAs"};
-
-
-  // histograms
-  HistogramRegistry registry{
-    "registry",
-    {{"hMass3", "3-prong candidates;inv. mass (#Xi #pi #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{100, 2., 3.}}}}}};
-
-  double massXi = RecoDecay::getMassPDG(kXiMinus);
-  double massPi = RecoDecay::getMassPDG(kPiPlus);
-  double massXicPlus = RecoDecay::getMassPDG(pdg::Code::kXiCPlus);
-
-  Filter filterSelectCollisions = (aod::hf_selcollision::whyRejectColl == 0);
-
-  using SelectedCollisions = soa::Filtered<soa::Join<aod::Collisions, aod::HFSelCollision>>;
-  using FullTracksExt = soa::Join<aod::FullTracks, aod::TracksDCA>;
-
-  void process(SelectedCollisions::iterator const& collision,
-               aod::BCs const& bcs,
-               aod::CascDataExt const& cascades,
-               aod::V0sLinked const&, aod::V0Datas const&,
-               MyTracks const& tracks
-               ) 
-  {
-    // Define o2 fitter, 3-prong
-    o2::vertexing::DCAFitterN<2> fitter2Pi;
-    fitter2Pi.setBz(bZ);
-    fitter2Pi.setPropagateToPCA(propDCA);
-    fitter2Pi.setMaxR(maxR);
-    fitter2Pi.setMinParamChange(minParamChange);
-    fitter2Pi.setMinRelChi2Change(minRelChi2Change);
-    fitter2Pi.setUseAbsDCA(UseAbsDCA);
-
-    // first loop over positive tracks
-    for (auto trackPos1 = tracks.begin(); trackPos1 != tracks.end(); ++trackPos1) {
-      if (trackPos1.signed1Pt() < 0) {
-        continue;
-      }
-
-      if (tracks.size() < 2) {
-            continue;
-      }
-      
-      if (!TESTBIT(trackPos1.isSelProng(), CandidateType::Cand3Prong)) {
-        continue;
-      }
-      
-      auto trackParVarPos1 = getTrackParCov(trackPos1);
-     
-      // second loop over positive tracks
-      for (auto trackPos2 = tracks.begin(); trackPos2 != tracks.end(); ++trackPos2) {
-        if (trackPos2.signed1Pt() < 0) {
+    
+    if(do3prong == 1) {
+      // first loop over positive tracks
+      for (auto trackPos1 = tracks.begin(); trackPos1 != tracks.end(); ++trackPos1) {
+        if (trackPos1.signed1Pt() < 0) {
           continue;
         }
-
-
+        if (tracks.size() < 2) {
+              continue;
+        }
+        if (!TESTBIT(trackPos1.isSelProng(), CandidateType::Cand3Prong)) {
+          continue;
+        }
         
-       
-        if (!TESTBIT(trackPos2.isSelProng(), CandidateType::Cand3Prong)) {
-          continue;
-        }
-
-        auto trackParVarPos2 = getTrackParCov(trackPos2);
-
-        for (auto& casc : cascades) {
-          auto v0 = casc.v0_as<o2::aod::V0sLinked>();
-          if (!(v0.has_v0Data())) {
-            continue; //skip those cascades for which V0 doesn't exist
+        // reconstruct the 3-prong secondary vertex
+        auto trackParVarPos1 = getTrackParCov(trackPos1);
+      
+        // second loop over positive tracks
+        for (auto trackPos2 = tracks.begin(); trackPos2 != tracks.end(); ++trackPos2) {
+          if (trackPos2.signed1Pt() < 0) {
+            continue;
           }
-
-          std::array<float, 3> pVec1 = {0., 0., 0.};
-          std::array<float, 3> pVec2 = {0., 0., 0.};
-          std::array<float, 3> pVecCascade = {casc.px(), casc.py(), casc.pz()};
-
-          if(fitter2Pi.process(trackParVarPos1, trackParVarPos2) == 0 ) {
+          if (!TESTBIT(trackPos2.isSelProng(), CandidateType::Cand3Prong)) {
             continue;
           }
 
-          fitter2Pi.getTrack(0).getPxPyPzGlo(pVec1); // take the momentum at the Lc vertex
-          fitter2Pi.getTrack(1).getPxPyPzGlo(pVec2);
-          
+          // reconstruct the 3-prong secondary vertex
+          auto trackParVarPos2 = getTrackParCov(trackPos2);
 
-          // invariant mass
-          // re-calculate invariant masses with updated momenta, to fill the histogram
-          double massXi = casc.mXi();
-          massXicPlus = RecoDecay::m(array{pVec1, pVecCascade, pVec2}, array{massPi, massXi , massPi});
+          for (auto& casc : cascades) {
+            auto v0 = casc.v0_as<o2::aod::V0sLinked>();
+            if (!(v0.has_v0Data())) {
+              continue; //skip those cascades for which V0 doesn't exist
+            }
 
-          // fill table row
-          rowTrackIndexCasc3Prong(trackPos1.globalIndex(),
-                            trackPos2.globalIndex(),
-                            casc.globalIndex());
-          // fill histograms
-          if (doValPlots) {
-            registry.fill(HIST("hMass3"), massXicPlus);
-          }
+            std::array<float, 3> pVec1 = {0., 0., 0.};
+            std::array<float, 3> pVec2 = {0., 0., 0.};
+            std::array<float, 3> pVecCascade = {casc.px(), casc.py(), casc.pz()};
 
-        } // loop over cascade
-      } // loop over tracks2
-    } // loop over track1
+            if(df3.process(trackParVarPos1, trackParVarPos2) == 0 ) {
+              continue;
+            }
+
+            df3.getTrack(0).getPxPyPzGlo(pVec1); // take the momentum at the Lc vertex
+            df3.getTrack(1).getPxPyPzGlo(pVec2);
+            
+            // invariant mass
+            // re-calculate invariant masses with updated momenta, to fill the histogram
+            double massXi = casc.mXi();
+            massXicPlus = RecoDecay::m(array{pVec1, pVecCascade, pVec2}, array{massPi, massXi , massPi});
+
+            // fill table row
+            rowTrackIndexCasc3Prong(trackPos1.globalIndex(),
+                              trackPos2.globalIndex(),
+                              casc.globalIndex());
+            // fill histograms
+            if (doValPlots) {
+              registry.fill(HIST("hMassXicToXiPiPi"), massXicPlus);
+            }
+          } // loop over cascade
+        } // loop over tracks2
+      } // loop over track1
+    }
   }   // process
 };
 
@@ -2473,7 +2388,6 @@ WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
   const bool doCascades = cfgc.options().get<bool>("doCascades");
   if (doCascades) {
     workflow.push_back(adaptAnalysisTask<HfTrackIndexSkimsCreatorCascades>(cfgc));
-    workflow.push_back(adaptAnalysisTask<HfTrackIndexSkimsCreatorCascades3Prong>(cfgc));
   }
 
   return workflow;
