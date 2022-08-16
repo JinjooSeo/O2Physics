@@ -2088,6 +2088,7 @@ struct HfTrackIndexSkimsCreator {
 
 struct HfTrackIndexSkimsCreatorCascades {
   Produces<aod::HfCascades> rowTrackIndexCasc;
+  Produces<aod::HfCascades3Prongs> rowTrackIndexCasc3Prong;
 
   // whether to do or not validation plots
   Configurable<bool> doValPlots{"doValPlots", true, "fill histograms"};
@@ -2131,7 +2132,7 @@ struct HfTrackIndexSkimsCreatorCascades {
   // histograms
   HistogramRegistry registry{
     "registry",
-     // 2-prong histograms
+    // 2-prong histograms
     {{"hVtx2ProngX", "2-prong candidates;#it{x}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx2ProngY", "2-prong candidates;#it{y}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx2ProngZ", "2-prong candidates;#it{z}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -20., 20.}}}},
@@ -2140,7 +2141,24 @@ struct HfTrackIndexSkimsCreatorCascades {
      {"hVtx3ProngX", "3-prong candidates;#it{x}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx3ProngY", "3-prong candidates;#it{y}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -2., 2.}}}},
      {"hVtx3ProngZ", "3-prong candidates;#it{z}_{sec. vtx.} (cm);entries", {HistType::kTH1F, {{1000, -20., 20.}}}},
-     {"hMassXicToXiPiPi", "3-prong candidates;inv. mass (#Xi #pi #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{100, 2., 3.}}}}}};
+     {"hMassXicToXiPiPi", "3-prong candidates;inv. mass (#Xi #pi #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{100, 2., 3.}}}},
+     // Cascade mass spectra
+     {"hMassXiMinus", "hMassXiMinus", {HistType::kTH1F, {{3000, 0.0f, 3.0f, "Inv. Mass (GeV/c^{2})"}}}},
+     {"hMassXiPlus", "hMassXiPlus", {HistType::kTH1F, {{3000, 0.0f, 3.0f, "Inv. Mass (GeV/c^{2}²)"}}}},
+     {"hMassOmegaMinus", "hMassOmegaMinus", {HistType::kTH1F, {{3000, 0.0f, 3.0f, "Inv. Mass (GeV/c^{2})"}}}},
+     {"hMassOmegaPlus", "hMassOmegaPlus", {HistType::kTH1F, {{3000, 0.0f, 3.0f, "Inv. Mass (GeV/c^{2})"}}}},
+     // Cascade topology
+     {"hV0Radius", "hV0Radius", {HistType::kTH1F, {{1000, 0.0f, 100.0f, "cm"}}}},
+     {"hCascRadius", "hCascRadius", {HistType::kTH1F, {{1000, 0.0f, 100.0f, "cm"}}}},
+     {"hV0CosPA", "hV0CosPA", {HistType::kTH1F, {{1000, 0.95f, 1.0f}}}},
+     {"hCascCosPA", "hCascCosPA", {HistType::kTH1F, {{1000, 0.95f, 1.0f}}}},
+     {"hDCAPosToPV", "hDCAPosToPV", {HistType::kTH1F, {{1000, -10.0f, 10.0f, "cm"}}}},
+     {"hDCANegToPV", "hDCANegToPV", {HistType::kTH1F, {{1000, -10.0f, 10.0f, "cm"}}}},
+     {"hDCABachToPV", "hDCABachToPV", {HistType::kTH1F, {{1000, -10.0f, 10.0f, "cm"}}}},
+     {"hDCAV0ToPV", "hDCAV0ToPV", {HistType::kTH1F, {{1000, -10.0f, 10.0f, "cm"}}}},
+     {"hDCAV0Dau", "hDCAV0Dau", {HistType::kTH1F, {{1000, 0.0f, 10.0f, "cm^{2}"}}}},
+     {"hDCACascDau", "hDCACascDau", {HistType::kTH1F, {{1000, 0.0f, 10.0f, "cm^{2}"}}}},
+     {"hLambdaMass", "hLambdaMass", {HistType::kTH1F, {{1000, 0.0f, 10.0f, "Inv. Mass (GeV/c^{2})"}}}}}};
 
   double massP = RecoDecay::getMassPDG(kProton);
   double massK0s = RecoDecay::getMassPDG(kK0Short);
@@ -2160,30 +2178,28 @@ struct HfTrackIndexSkimsCreatorCascades {
                aod::BCs const& bcs,
                aod::V0Datas const& V0s,
                aod::V0sLinked const&,
-               aod::CascData const& cascades,
-               SelectedTracks const& tracks
-               ) // TODO: I am now assuming that the V0s are already filtered with my cuts (David's work to come)
+               aod::CascDataExt const& cascades,
+               SelectedTracks const& tracks) // TODO: I am now assuming that the V0s are already filtered with my cuts (David's work to come)
   {
     // 2-prong vertex fitter
-      o2::vertexing::DCAFitterN<2> df2;
-      df2.setBz(bz);
-      df2.setPropagateToPCA(propToDCA);
-      df2.setMaxR(maxRad);
-      df2.setMaxDZIni(maxDZIni);
-      df2.setMinParamChange(minParamChange);
-      df2.setMinRelChi2Change(minRelChi2Change);
-      df2.setUseAbsDCA(useAbsDCA);
+    o2::vertexing::DCAFitterN<2> df2;
+    df2.setBz(bz);
+    df2.setPropagateToPCA(propToDCA);
+    df2.setMaxR(maxRad);
+    df2.setMaxDZIni(maxDZIni);
+    df2.setMinParamChange(minParamChange);
+    df2.setMinRelChi2Change(minRelChi2Change);
+    df2.setUseAbsDCA(useAbsDCA);
 
-      // 3-prong vertex fitter
-      // FIXME: Modify the DCAFitter with cascade
-      o2::vertexing::DCAFitterN<2> df3;
-      df3.setBz(bz);
-      df3.setPropagateToPCA(propToDCA);
-      df3.setMaxR(maxRad);
-      df3.setMaxDZIni(maxDZIni);
-      df3.setMinParamChange(minParamChange);
-      df3.setMinRelChi2Change(minRelChi2Change);
-      df3.setUseAbsDCA(useAbsDCA);
+    // 3-prong vertex fitter
+    o2::vertexing::DCAFitterN<3> df3;
+    df3.setBz(bz);
+    df3.setPropagateToPCA(propToDCA);
+    df3.setMaxR(maxRad);
+    df3.setMaxDZIni(maxDZIni);
+    df3.setMinParamChange(minParamChange);
+    df3.setMinRelChi2Change(minRelChi2Change);
+    df3.setUseAbsDCA(useAbsDCA);
 
     // fist we loop over the bachelor candidate
     // for (const auto& bach : selectedTracks) {
@@ -2212,8 +2228,8 @@ struct HfTrackIndexSkimsCreatorCascades {
       for (const auto& v0 : V0s) {
         MY_DEBUG_MSG(1, LOG(info) << "*** Checking next K0S");
         // selections on the V0 daughters
-        const auto& trackV0DaughPos = v0.posTrack_as<MyTracks>();
-        const auto& trackV0DaughNeg = v0.negTrack_as<MyTracks>();
+        const auto& trackV0DaughPos = v0.posTrack_as<SelectedTracks>();
+        const auto& trackV0DaughNeg = v0.negTrack_as<SelectedTracks>();
 
         if (TPCRefitV0Daugh) {
           if (!(trackV0DaughPos.trackType() & o2::aod::track::TPCrefit) ||
@@ -2255,9 +2271,9 @@ struct HfTrackIndexSkimsCreatorCascades {
         }
 
         auto trackParCovV0DaughPos = getTrackParCov(trackV0DaughPos);
-        trackParCovV0DaughPos.propagateTo(v0.posX(), bZ); // propagate the track to the X closest to the V0 vertex
+        trackParCovV0DaughPos.propagateTo(v0.posX(), bz); // propagate the track to the X closest to the V0 vertex
         auto trackParCovV0DaughNeg = getTrackParCov(trackV0DaughNeg);
-        trackParCovV0DaughNeg.propagateTo(v0.negX(), bZ); // propagate the track to the X closest to the V0 vertex
+        trackParCovV0DaughNeg.propagateTo(v0.negX(), bz); // propagate the track to the X closest to the V0 vertex
         std::array<float, 3> pVecV0 = {0., 0., 0.};
         std::array<float, 3> pVecBach = {0., 0., 0.};
 
@@ -2266,13 +2282,13 @@ struct HfTrackIndexSkimsCreatorCascades {
         auto trackV0 = o2::dataformats::V0(vertexV0, momentumV0, {0, 0, 0, 0, 0, 0}, trackParCovV0DaughPos, trackParCovV0DaughNeg, {0, 0}, {0, 0}); // build the V0 track
 
         // now we find the DCA between the V0 and the bachelor, for the cascade
-        int nCand2 = fitter.process(trackV0, trackBach);
+        int nCand2 = df2.process(trackV0, trackBach);
         if (nCand2 == 0) {
           continue;
         }
-        fitter.propagateTracksToVertex();        // propagate the bach and V0 to the Lc vertex
-        fitter.getTrack(0).getPxPyPzGlo(pVecV0); // take the momentum at the Lc vertex
-        fitter.getTrack(1).getPxPyPzGlo(pVecBach);
+        df2.propagateTracksToVertex();        // propagate the bach and V0 to the Lc vertex
+        df2.getTrack(0).getPxPyPzGlo(pVecV0); // take the momentum at the Lc vertex
+        df2.getTrack(1).getPxPyPzGlo(pVecBach);
 
         // cascade candidate pT cut
         auto ptCascCand = RecoDecay::pt(pVecBach, pVecV0);
@@ -2285,7 +2301,7 @@ struct HfTrackIndexSkimsCreatorCascades {
         mass2K0sP = RecoDecay::m(array{pVecBach, pVecV0}, array{massP, massK0s});
 
         std::array<float, 3> posCasc = {0., 0., 0.};
-        const auto& cascVtx = fitter.getPCACandidate();
+        const auto& cascVtx = df2.getPCACandidate();
         for (int i = 0; i < 3; i++) {
           posCasc[i] = cascVtx[i];
         }
@@ -2302,25 +2318,42 @@ struct HfTrackIndexSkimsCreatorCascades {
           registry.fill(HIST("hMassLcToK0sPi"), mass2K0sP);
         }
       } // loop over V0s
-    } // loop over tracks
+    }   // loop over tracks
 
-    
-    if(do3prong == 1) {
+    if (do3prong == 1) {
+      // 2-prong vertex fitter for V0 and cascade
+      o2::vertexing::DCAFitterN<2> fitterV0, fitterCasc;
+      fitterV0.setBz(bz);
+      fitterV0.setPropagateToPCA(propToDCA);
+      fitterV0.setMaxR(maxRad);
+      fitterV0.setMaxDZIni(maxDZIni);
+      fitterV0.setMinParamChange(minParamChange);
+      fitterV0.setMinRelChi2Change(minRelChi2Change);
+      fitterV0.setUseAbsDCA(useAbsDCA);
+
+      fitterCasc.setBz(bz);
+      fitterCasc.setPropagateToPCA(propToDCA);
+      fitterCasc.setMaxR(maxRad);
+      fitterCasc.setMaxDZIni(maxDZIni);
+      fitterCasc.setMinParamChange(minParamChange);
+      fitterCasc.setMinRelChi2Change(minRelChi2Change);
+      fitterCasc.setUseAbsDCA(useAbsDCA);
+
       // first loop over positive tracks
       for (auto trackPos1 = tracks.begin(); trackPos1 != tracks.end(); ++trackPos1) {
         if (trackPos1.signed1Pt() < 0) {
           continue;
         }
         if (tracks.size() < 2) {
-              continue;
+          continue;
         }
         if (!TESTBIT(trackPos1.isSelProng(), CandidateType::Cand3Prong)) {
           continue;
         }
-        
+
         // reconstruct the 3-prong secondary vertex
         auto trackParVarPos1 = getTrackParCov(trackPos1);
-      
+
         // second loop over positive tracks
         for (auto trackPos2 = tracks.begin(); trackPos2 != tracks.end(); ++trackPos2) {
           if (trackPos2.signed1Pt() < 0) {
@@ -2336,38 +2369,155 @@ struct HfTrackIndexSkimsCreatorCascades {
           for (auto& casc : cascades) {
             auto v0 = casc.v0_as<o2::aod::V0sLinked>();
             if (!(v0.has_v0Data())) {
-              continue; //skip those cascades for which V0 doesn't exist
+              continue; // skip those cascades for which V0 doesn't exist
             }
 
-            std::array<float, 3> pVec1 = {0., 0., 0.};
-            std::array<float, 3> pVec2 = {0., 0., 0.};
-            std::array<float, 3> pVecCascade = {casc.px(), casc.py(), casc.pz()};
+            auto v0data = v0.v0Data(); // de-reference index to correct v0data in case it exists
 
-            if(df3.process(trackParVarPos1, trackParVarPos2) == 0 ) {
+            if (casc.sign() < 0) { // FIXME: could be done better...
+              registry.fill(HIST("hMassXiMinus"), casc.mXi());
+              registry.fill(HIST("hMassOmegaMinus"), casc.mOmega());
+            } else {
+              registry.fill(HIST("hMassXiPlus"), casc.mXi());
+              registry.fill(HIST("hMassOmegaPlus"), casc.mOmega());
+            }
+            // The basic eleven!
+            registry.fill(HIST("hV0Radius"), casc.v0radius());
+            registry.fill(HIST("hCascRadius"), casc.cascradius());
+            registry.fill(HIST("hV0CosPA"), casc.v0cosPA(collision.posX(), collision.posY(), collision.posZ()));
+            registry.fill(HIST("hCascCosPA"), casc.casccosPA(collision.posX(), collision.posY(), collision.posZ()));
+            registry.fill(HIST("hDCAPosToPV"), casc.dcapostopv());
+            registry.fill(HIST("hDCANegToPV"), casc.dcanegtopv());
+            registry.fill(HIST("hDCABachToPV"), casc.dcabachtopv());
+            registry.fill(HIST("hDCAV0ToPV"), casc.dcav0topv(collision.posX(), collision.posY(), collision.posZ()));
+            registry.fill(HIST("hDCAV0Dau"), casc.dcaV0daughters());
+            registry.fill(HIST("hDCACascDau"), casc.dcacascdaughters());
+            registry.fill(HIST("hLambdaMass"), casc.mLambda());
+
+            const auto& trackV0DaughPos = v0data.posTrack_as<SelectedTracks>();
+            const auto& trackV0DaughNeg = v0data.negTrack_as<SelectedTracks>();
+            const auto& bachTrackCascade = casc.bachelor_as<SelectedTracks>();
+
+            std::array<float, 3> pos = {0.};
+            std::array<float, 3> posCascade = {0.};
+            std::array<float, 3> pvecpos = {0.};
+            std::array<float, 3> pvecneg = {0.};
+            std::array<float, 3> pvecBach = {0.};
+
+            auto trackParCovV0DaughPos = getTrackParCov(trackV0DaughPos);
+            trackParCovV0DaughPos.propagateTo(v0data.posX(), bz); // propagate the track to the X closest to the V0 vertex
+            auto trackParCovV0DaughNeg = getTrackParCov(trackV0DaughNeg);
+            trackParCovV0DaughNeg.propagateTo(v0data.negX(), bz); // propagate the track to the X closest to the V0 vertex
+
+            // Acquire basic tracks
+            auto pTrack = getTrackParCov(trackV0DaughPos);
+            auto nTrack = getTrackParCov(trackV0DaughNeg);
+            auto bTrack = getTrackParCov(bachTrackCascade);
+
+            int nCand = fitterV0.process(pTrack, nTrack);
+            if (nCand != 0) {
+              fitterV0.propagateTracksToVertex();
+              const auto& v0vtx = fitterV0.getPCACandidate();
+              for (int i = 0; i < 3; i++) {
+                pos[i] = v0vtx[i];
+              }
+              // Covariance matrix calculation
+              std::array<float, 21> cov0 = {0};
+              std::array<float, 21> cov1 = {0};
+              std::array<float, 21> covV0 = {0};
+
+              const int momInd[6] = {9, 13, 14, 18, 19, 20}; // cov matrix elements for momentum component
+              fitterV0.getTrack(0).getPxPyPzGlo(pvecpos);
+              fitterV0.getTrack(1).getPxPyPzGlo(pvecneg);
+              fitterV0.getTrack(0).getCovXYZPxPyPzGlo(cov0);
+              fitterV0.getTrack(1).getCovXYZPxPyPzGlo(cov1);
+              for (int i = 0; i < 6; i++) {
+                int j = momInd[i];
+                covV0[j] = cov0[j] + cov1[j];
+              }
+              auto covVtxV0 = fitterV0.calcPCACovMatrix();
+              covV0[0] = covVtxV0(0, 0);
+              covV0[1] = covVtxV0(1, 0);
+              covV0[2] = covVtxV0(1, 1);
+              covV0[3] = covVtxV0(2, 0);
+              covV0[4] = covVtxV0(2, 1);
+              covV0[5] = covVtxV0(2, 2);
+
+              const std::array<float, 3> posV0 = {(float)v0vtx[0], (float)v0vtx[1], (float)v0vtx[2]};
+              const std::array<float, 3> pvecV0 = {pvecpos[0] + pvecneg[0], pvecpos[1] + pvecneg[1], pvecpos[2] + pvecneg[2]};
+
+              // we build the neutral track to then build the cascade
+              auto trackV0 = o2::track::TrackParCov(posV0, pvecV0, covV0, 0);
+              trackV0.setQ2Pt(0); // No bending, please
+              int nCand2 = fitterCasc.process(trackV0, bTrack);
+              if (nCand2 == 0) {
+				        continue;
+			        }
+                fitterCasc.propagateTracksToVertex();
+                const auto& cascvtx = fitterCasc.getPCACandidate();
+                for (int i = 0; i < 3; i++) {
+                  posCascade[i] = cascvtx[i];
+                }
+                fitterCasc.getTrack(1).getPxPyPzGlo(pvecBach);
+              //} // end if cascade recoed
+
+              std::array<float, 3> pvecCascade = {pvecV0[0] + pvecBach[0], pvecV0[1] + pvecBach[1], pvecV0[2] + pvecBach[2]};
+              std::array<float, 3> pVec1 = {0.};
+              std::array<float, 3> pVec2 = {0.};
+
+              // Covariance matrix calculation for cascade
+              std::array<float, 21> cov2 = {0};
+              std::array<float, 21> cov3 = {0};
+              std::array<float, 21> covCascade = {0};
+
+              fitterCasc.getTrack(0).getCovXYZPxPyPzGlo(cov2);
+              fitterCasc.getTrack(1).getCovXYZPxPyPzGlo(cov3);
+              for (int i = 0; i < 6; i++) {
+                int j = momInd[i];
+                covCascade[j] = cov2[j] + cov3[j];
+              }
+              auto covVtxCascade = fitterCasc.calcPCACovMatrix();
+              covCascade[0] = covVtxCascade(0, 0);
+              covCascade[1] = covVtxCascade(1, 0);
+              covCascade[2] = covVtxCascade(1, 1);
+              covCascade[3] = covVtxCascade(2, 0);
+              covCascade[4] = covVtxCascade(2, 1);
+              covCascade[5] = covVtxCascade(2, 2);
+
+              auto trackCascade = o2::track::TrackParCov(posCascade, pvecCascade, covCascade, 0);
+
+              if (df3.process(trackParVarPos1, trackParVarPos2, trackCascade) == 0) {
+                continue;
+              }
+
+              df3.getTrack(0).getPxPyPzGlo(pVec1); // take the momentum at the Lc vertex
+              df3.getTrack(1).getPxPyPzGlo(pVec2);
+
+              // invariant mass
+              // re-calculate invariant masses with updated momenta, to fill the histogram
+              double massXi = casc.mXi();
+              massXicPlus = RecoDecay::m(array{pVec1, pvecCascade, pVec2}, array{massPi, massXi, massPi});
+
+            } else {
               continue;
             }
 
-            df3.getTrack(0).getPxPyPzGlo(pVec1); // take the momentum at the Lc vertex
-            df3.getTrack(1).getPxPyPzGlo(pVec2);
-            
-            // invariant mass
-            // re-calculate invariant masses with updated momenta, to fill the histogram
-            double massXi = casc.mXi();
-            massXicPlus = RecoDecay::m(array{pVec1, pVecCascade, pVec2}, array{massPi, massXi , massPi});
-
             // fill table row
             rowTrackIndexCasc3Prong(trackPos1.globalIndex(),
-                              trackPos2.globalIndex(),
-                              casc.globalIndex());
+                                    trackPos2.globalIndex(),
+                                    casc.globalIndex());
             // fill histograms
             if (doValPlots) {
+              registry.fill(HIST("hVtx3ProngX"), posCascade[0]);
+              registry.fill(HIST("hVtx3ProngY"), posCascade[1]);
+              registry.fill(HIST("hVtx3ProngZ"), posCascade[2]);
               registry.fill(HIST("hMassXicToXiPiPi"), massXicPlus);
             }
           } // loop over cascade
         } // loop over tracks2
       } // loop over track1
     }
-  }   // process
+  } // process
 };
 
 //________________________________________________________________________________________________________________________
