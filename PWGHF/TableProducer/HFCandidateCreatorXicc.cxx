@@ -65,7 +65,7 @@ struct HfCandidateCreatorXicc {
   Filter filterSelectCandidates = (aod::hf_selcandidate_xic::isSelXicToPKPi >= d_selectionFlagXic || aod::hf_selcandidate_xic::isSelXicToPiKP >= d_selectionFlagXic);
 
   void process(aod::Collision const& collision,
-               soa::Filtered<soa::Join<aod::HfCandProng3, aod::HFSelXicToPKPiCandidate>> const& xicCands,
+               soa::Filtered<soa::Join<aod::HfCandProng3, aod::HFSelXicCandidate>> const& xicCands,
                aod::BigTracks const& tracks)
   {
     // 3-prong vertex fitter to rebuild the Xic vertex

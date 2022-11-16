@@ -218,9 +218,14 @@ namespace hf_selcandidate_xic
 {
 DECLARE_SOA_COLUMN(IsSelXicToPKPi, isSelXicToPKPi, int); //!
 DECLARE_SOA_COLUMN(IsSelXicToPiKP, isSelXicToPiKP, int); //!
+DECLARE_SOA_COLUMN(IsSelXicToXiPiPi, isSelXicToXiPiPi, int); //!
+DECLARE_SOA_COLUMN(IsSelXicToPiPiXi, isSelXicToPiPiXi, int); //!
 } // namespace hf_selcandidate_xic
-DECLARE_SOA_TABLE(HFSelXicToPKPiCandidate, "AOD", "HFSELXICCAND", //!
-                  hf_selcandidate_xic::IsSelXicToPKPi, hf_selcandidate_xic::IsSelXicToPiKP);
+DECLARE_SOA_TABLE(HFSelXicCandidate, "AOD", "HFSELXICCAND", //!
+                  hf_selcandidate_xic::IsSelXicToPKPi, 
+                  hf_selcandidate_xic::IsSelXicToPiKP,
+                  hf_selcandidate_xic::IsSelXicToXiPiPi,
+                  hf_selcandidate_xic::IsSelXicToPiPiXi);
 
 namespace hf_selcandidate_xicc
 {

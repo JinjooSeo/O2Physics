@@ -91,9 +91,9 @@ struct HfTaskXic {
     registry.add("hPtProng2RecBg", "3-prong candidates;prong 2 #it{p}_{T} (GeV/#it{c});;entries", {HistType::kTH2F, {{100, 0., 10.}, {vbins, "#it{p}_{T} (GeV/#it{c})"}}});
   }
 
-  Partition<soa::Join<aod::HfCandProng3, aod::HFSelXicToPKPiCandidate>> selectedXicCandidates = aod::hf_selcandidate_xic::isSelXicToPKPi >= d_selectionFlagXic || aod::hf_selcandidate_xic::isSelXicToPiKP >= d_selectionFlagXic;
+  Partition<soa::Join<aod::HfCandProng3, aod::HFSelXicCandidate>> selectedXicCandidates = aod::hf_selcandidate_xic::isSelXicToPKPi >= d_selectionFlagXic || aod::hf_selcandidate_xic::isSelXicToPiKP >= d_selectionFlagXic;
 
-  void process(soa::Join<aod::HfCandProng3, aod::HFSelXicToPKPiCandidate> const& candidates)
+  void process(soa::Join<aod::HfCandProng3, aod::HFSelXicCandidate> const& candidates)
   {
     for (auto& candidate : selectedXicCandidates) {
       if (!(candidate.hfflag() & 1 << DecayType::XicToPKPi)) {
@@ -131,9 +131,9 @@ struct HfTaskXic {
     }
   }
 
-  Partition<soa::Join<aod::HfCandProng3, aod::HFSelXicToPKPiCandidate, aod::HfCandProng3MCRec>> selectedMCXicCandidates = (aod::hf_selcandidate_xic::isSelXicToPKPi >= d_selectionFlagXic || aod::hf_selcandidate_xic::isSelXicToPiKP >= d_selectionFlagXic);
+  Partition<soa::Join<aod::HfCandProng3, aod::HFSelXicCandidate, aod::HfCandProng3MCRec>> selectedMCXicCandidates = (aod::hf_selcandidate_xic::isSelXicToPKPi >= d_selectionFlagXic || aod::hf_selcandidate_xic::isSelXicToPiKP >= d_selectionFlagXic);
 
-  void processMC(soa::Join<aod::HfCandProng3, aod::HFSelXicToPKPiCandidate, aod::HfCandProng3MCRec> const& candidates,
+  void processMC(soa::Join<aod::HfCandProng3, aod::HFSelXicCandidate, aod::HfCandProng3MCRec> const& candidates,
                  soa::Join<aod::McParticles, aod::HfCandProng3MCGen> const& particlesMC, aod::BigTracksMC const&)
   {
     // MC rec.

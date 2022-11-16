@@ -96,6 +96,7 @@ DECLARE_SOA_INDEX_COLUMN_FULL(Index0, index0, int, Tracks, "_0"); //! Index to f
 DECLARE_SOA_INDEX_COLUMN_FULL(Index1, index1, int, Tracks, "_1"); //! Index to second prong
 DECLARE_SOA_INDEX_COLUMN_FULL(Index2, index2, int, Tracks, "_2"); //! Index to third prong
 DECLARE_SOA_INDEX_COLUMN(V0, v0);                                 //! Index to V0 prong
+DECLARE_SOA_INDEX_COLUMN(Cascade, cascade);                       //! Index to cascade prong
 DECLARE_SOA_COLUMN(HFflag, hfflag, uint8_t);                      //!
 
 DECLARE_SOA_COLUMN(D0ToKPiFlag, d0ToKPiFlag, uint8_t);       //!
@@ -128,6 +129,19 @@ DECLARE_SOA_TABLE(Hf3Prongs, "AOD", "HF3PRONG", //! Table for HF 3 prong candida
                   hf_track_index::Index2Id,
                   hf_track_index::HFflag);
 using Hf3Prong = Hf3Prongs::iterator;
+
+DECLARE_SOA_TABLE(HfCascade2Prongs, "AOD", "HFCASCADE2PRONG", //! Table for HF 2 prong candidates with a Cascade
+                  o2::soa::Index<>,
+                  hf_track_index::CascadeId,
+                  hf_track_index::Index0Id);
+using HfCascade2Prong = HfCascade2Prongs::iterator;
+
+DECLARE_SOA_TABLE(HfCascade3Prongs, "AOD", "HFCASCADE3PRONG", //! Table for HF 3 prong candidates with a Cascade
+                  o2::soa::Index<>,
+                  hf_track_index::CascadeId,
+                  hf_track_index::Index0Id,
+                  hf_track_index::Index1Id);
+using HfCascade3Prong = HfCascade3Prongs::iterator;
 
 namespace hf_track_index
 {
@@ -885,6 +899,138 @@ DECLARE_SOA_TABLE(HfCandProng3MCGen, "AOD", "HFCANDP3MCGEN", //!
                   hf_cand_prong3::FlagMCMatchGen,
                   hf_cand_prong3::OriginMCGen,
                   hf_cand_prong3::FlagMCDecayChanGen);
+
+
+namespace hf_cand_casc_prong3
+{
+DECLARE_SOA_EXPRESSION_COLUMN(Px, px, //!
+                              float, 1.f * aod::hf_cand::pxProng0 + 1.f * aod::hf_cand::pxProng1 + 1.f * aod::hf_cand::pxProng2);
+DECLARE_SOA_EXPRESSION_COLUMN(Py, py, //!
+                              float, 1.f * aod::hf_cand::pyProng0 + 1.f * aod::hf_cand::pyProng1 + 1.f * aod::hf_cand::pyProng2);
+DECLARE_SOA_EXPRESSION_COLUMN(Pz, pz, //!
+                              float, 1.f * aod::hf_cand::pzProng0 + 1.f * aod::hf_cand::pzProng1 + 1.f * aod::hf_cand::pzProng2);
+DECLARE_SOA_DYNAMIC_COLUMN(M, m, //!
+                           [](float px0, float py0, float pz0, float px1, float py1, float pz1, float px2, float py2, float pz2, const array<double, 3>& m) -> float { return RecoDecay::m(array{array{px0, py0, pz0}, array{px1, py1, pz1}, array{px2, py2, pz2}}, m); });
+DECLARE_SOA_DYNAMIC_COLUMN(M2, m2, //!
+                           [](float px0, float py0, float pz0, float px1, float py1, float pz1, float px2, float py2, float pz2, const array<double, 3>& m) -> float { return RecoDecay::m2(array{array{px0, py0, pz0}, array{px1, py1, pz1}, array{px2, py2, pz2}}, m); });
+DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProngSqSum, impactParameterProngSqSum, //!
+                           [](float impParProng0, float impParProng1, float impParProng2) -> float { return RecoDecay::sumOfSquares(impParProng0, impParProng1, impParProng2); });
+DECLARE_SOA_DYNAMIC_COLUMN(MaxNormalisedDeltaIP, maxNormalisedDeltaIP, //! 
+                           [](float xVtxP, float yVtxP, float xVtxS, float yVtxS, float errDlxy, float pxM, float pyM, float ip0, float errIp0, float ip1, float errIp1, float ip2, float errIp2, float px0, float py0, float px1, float py1, float px2, float py2) -> float { return RecoDecay::maxNormalisedDeltaIP(array{xVtxP, yVtxP}, array{xVtxS, yVtxS}, errDlxy, array{pxM, pyM}, array{ip0, ip1, ip2}, array{errIp0, errIp1, errIp2}, array{array{px0, py0}, array{px1, py1}, array{px2, py2}}); });
+DECLARE_SOA_DYNAMIC_COLUMN(V0CosPA, v0cosPA, //!
+                           [](float Xlambda, float Ylambda, float Zlambda, float PxLambda, float PyLambda, float PzLambda, float pvX, float pvY, float pvZ) -> float { return RecoDecay::cpa(array{pvX, pvY, pvZ}, array{Xlambda, Ylambda, Zlambda}, array{PxLambda, PyLambda, PzLambda}); });
+DECLARE_SOA_DYNAMIC_COLUMN(CascCosPA, casccosPA, //!
+                           [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return RecoDecay::cpa(array{pvX, pvY, pvZ}, array{X, Y, Z}, array{Px, Py, Pz}); });
+DECLARE_SOA_DYNAMIC_COLUMN(DCAV0ToPV, dcav0topv, //!
+                           [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return std::sqrt((std::pow((pvY - Y) * Pz - (pvZ - Z) * Py, 2) + std::pow((pvX - X) * Pz - (pvZ - Z) * Px, 2) + std::pow((pvX - X) * Py - (pvY - Y) * Px, 2)) / (Px * Px + Py * Py + Pz * Pz)); });
+DECLARE_SOA_DYNAMIC_COLUMN(DCACascToPV, dcacasctopv, //! 
+                           [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return std::sqrt((std::pow((pvY - Y) * Pz - (pvZ - Z) * Py, 2) + std::pow((pvX - X) * Pz - (pvZ - Z) * Px, 2) + std::pow((pvX - X) * Py - (pvY - Y) * Px, 2)) / (Px * Px + Py * Py + Pz * Pz)); });
+
+// MC matching result:
+DECLARE_SOA_COLUMN(FlagMCMatchRec, flagMCMatchRec, int8_t);         //! reconstruction level
+DECLARE_SOA_COLUMN(FlagMCMatchGen, flagMCMatchGen, int8_t);         //! generator level
+DECLARE_SOA_COLUMN(OriginMCRec, originMCRec, int8_t);               //! particle origin, reconstruction level
+DECLARE_SOA_COLUMN(OriginMCGen, originMCGen, int8_t);               //! particle origin, generator level
+DECLARE_SOA_COLUMN(IsCandidateSwapped, isCandidateSwapped, int8_t); //! swapping of the prongs order
+DECLARE_SOA_COLUMN(FlagMCDecayChanRec, flagMCDecayChanRec, int8_t); //! resonant decay channel flag, reconstruction level
+DECLARE_SOA_COLUMN(FlagMCDecayChanGen, flagMCDecayChanGen, int8_t); //! resonant decay channel flag, generator level
+
+// mapping of decay types
+enum DecayType { XicToXiPiPi = 0,
+                 N3ProngDecays }; // always keep N3ProngDecays at the end
+
+// functions for specific particles
+// Ξc± → Ξ∓ π± π±
+
+template <typename T>
+auto CtXic(const T& candidate)
+{
+  return candidate.ct(RecoDecay::getMassPDG(pdg::Code::kXiCPlus));
+}
+
+template <typename T>
+auto YXic(const T& candidate)
+{
+  return candidate.y(RecoDecay::getMassPDG(pdg::Code::kXiCPlus));
+}
+
+template <typename T>
+auto EXic(const T& candidate)
+{
+  return candidate.e(RecoDecay::getMassPDG(pdg::Code::kXiCPlus));
+}
+
+template <typename T>
+auto InvMassXic(const T& candidate)
+{
+  return candidate.m(array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kXiMinus), RecoDecay::getMassPDG(kPiPlus)});
+}
+
+template <typename T>
+auto InvMassXicbar(const T& candidate)
+{
+  return candidate.m(array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kXiMinus), RecoDecay::getMassPDG(kPiPlus)});
+}
+
+} // namespace hf_cand_casc_prong3
+
+// 3-prong cascade decay candidate table
+DECLARE_SOA_TABLE(HfCandCascProng3Base, "AOD", "HFCANDCP3BASE", //!
+                  o2::soa::Index<>,
+                  // general columns
+                  HFCAND_COLUMNS,
+                  // 3-prong specific columns
+                  hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0,
+                  hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1,
+                  hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2,
+                  hf_cand::ImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ImpactParameter2,
+                  hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1, hf_cand::ErrorImpactParameter2,
+                  hf_track_index::CascadeId, hf_track_index::Index0Id, hf_track_index::Index1Id,
+                  cascdata::Sign,
+                  cascdata::DCAV0Daughters, cascdata::DCACascDaughters,
+                  cascdata::DCAPosToPV, cascdata::DCANegToPV, cascdata::DCABachToPV,
+                  hf_track_index::HFflag,
+                  /* dynamic columns */
+                  hf_cand_casc_prong3::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
+                  hf_cand_casc_prong3::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
+                  hf_cand_casc_prong3::ImpactParameterProngSqSum<hf_cand::ImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ImpactParameter2>,
+                  /* prong 2 */
+                  hf_cand::ImpactParameterNormalised2<hf_cand::ImpactParameter2, hf_cand::ErrorImpactParameter2>,
+                  hf_cand::PtProng2<hf_cand::PxProng2, hf_cand::PyProng2>,
+                  hf_cand::Pt2Prong2<hf_cand::PxProng2, hf_cand::PyProng2>,
+                  hf_cand::PVectorProng2<hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
+                  /* dynamic columns that use candidate momentum components */
+                  hf_cand::Pt<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py>,
+                  hf_cand::Pt2<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py>,
+                  hf_cand::P<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::P2<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::PVector<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::CPA<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::CPAXY<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py>,
+                  hf_cand::Ct<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::ImpactParameterXY<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand_casc_prong3::MaxNormalisedDeltaIP<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ErrorDecayLengthXY, hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand::ImpactParameter0, hf_cand::ErrorImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ErrorImpactParameter1, hf_cand::ImpactParameter2, hf_cand::ErrorImpactParameter2, hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PxProng2, hf_cand::PyProng2>,
+                  hf_cand::Eta<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::Phi<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py>,
+                  hf_cand::Y<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::E<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>,
+                  hf_cand::E2<hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz>);
+
+// extended table with expression columns that can be used as arguments of dynamic columns
+DECLARE_SOA_EXTENDED_TABLE_USER(HfCandCascProng3Ext, HfCandCascProng3Base, "HFCANDCP3EXT", //!
+                                hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz);
+
+using HfCandCascProng3 = HfCandCascProng3Ext;
+
+// table with results of reconstruction level MC matching
+DECLARE_SOA_TABLE(HfCandCascProng3MCRec, "AOD", "HFCANDC3MCREC", //!
+                  hf_cand_casc_prong3::FlagMCMatchRec,
+                  hf_cand_casc_prong3::OriginMCRec);
+
+// table with results of generator level MC matching
+DECLARE_SOA_TABLE(HfCandCascProng3MCGen, "AOD", "HFCANDCP3MCGEN", //!
+                  hf_cand_casc_prong3::FlagMCMatchGen,
+                  hf_cand_casc_prong3::OriginMCGen);
 
 // specific X candidate properties
 namespace hf_cand_x

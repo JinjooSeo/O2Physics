@@ -29,7 +29,7 @@ using namespace o2::analysis::hf_cuts_xic_topkpi;
 
 /// Struct for applying Xic selection cuts
 struct HFXicToPKPiCandidateSelector {
-  Produces<aod::HFSelXicToPKPiCandidate> hfSelXicToPKPiCandidate;
+  Produces<aod::HFSelXicCandidate> hfSelXicToPKPiCandidate;
 
   Configurable<double> decayLengthXYNormalisedMin{"decayLengthXYNormalisedMin", 3., "Min. normalised decay length XY"};
   Configurable<double> d_pTCandMin{"d_pTCandMin", 0., "Lower bound of candidate pT"};
@@ -162,7 +162,7 @@ struct HFXicToPKPiCandidateSelector {
       auto statusXicToPiKP = 0;
 
       if (!(candidate.hfflag() & 1 << DecayType::XicToPKPi)) {
-        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP);
+        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP, 0, 0);
         continue;
       }
 
@@ -182,7 +182,7 @@ struct HFXicToPKPiCandidateSelector {
 
       // conjugate-independent topological selection
       if (!selectionTopol(candidate)) {
-        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP);
+        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP, 0, 0);
         continue;
       }
 
@@ -192,7 +192,7 @@ struct HFXicToPKPiCandidateSelector {
       bool topolXicToPiKP = selectionTopolConjugate(candidate, trackPos2, trackNeg, trackPos1);
 
       if (!topolXicToPKPi && !topolXicToPiKP) {
-        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP);
+        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP, 0, 0);
         continue;
       }
 
@@ -232,7 +232,7 @@ struct HFXicToPKPiCandidateSelector {
       }
 
       if (pidXicToPKPi == 0 && pidXicToPiKP == 0) {
-        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP);
+        hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP, 0, 0);
         continue;
       }
 
@@ -243,7 +243,7 @@ struct HFXicToPKPiCandidateSelector {
         statusXicToPiKP = 1; // identified as Xic->piKp
       }
 
-      hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP);
+      hfSelXicToPKPiCandidate(statusXicToPKPi, statusXicToPiKP, 0, 0);
     }
   }
 };
