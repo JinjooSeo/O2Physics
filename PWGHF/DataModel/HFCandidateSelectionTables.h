@@ -58,12 +58,12 @@ DECLARE_SOA_TABLE(HFSelD0CandidateparametrizedPID, "AOD", "HFSELD0CANDP", //!
 
 namespace hf_selcandidate_d0_ALICE3_Barrel
 {
-DECLARE_SOA_COLUMN(IsSelHFFlag, isSelHFFlag, int);                     //!
-DECLARE_SOA_COLUMN(IsSelD0NoPID, isSelD0NoPID, int);                   //!
-DECLARE_SOA_COLUMN(IsSelD0PerfectPID, isSelD0PerfectPID, int);         //!
-DECLARE_SOA_COLUMN(IsSelD0TOFPID, isSelD0TOFPID, int);                 //!
-DECLARE_SOA_COLUMN(IsSelD0RICHPID, isSelD0RICHPID, int);               //!
-DECLARE_SOA_COLUMN(IsSelD0TOFplusRICHPID, isSelD0TOFplusRICHPID, int); //!
+DECLARE_SOA_COLUMN(IsSelHFFlag, isSelHFFlag, int);                           //!
+DECLARE_SOA_COLUMN(IsSelD0NoPID, isSelD0NoPID, int);                         //!
+DECLARE_SOA_COLUMN(IsSelD0PerfectPID, isSelD0PerfectPID, int);               //!
+DECLARE_SOA_COLUMN(IsSelD0TOFPID, isSelD0TOFPID, int);                       //!
+DECLARE_SOA_COLUMN(IsSelD0RICHPID, isSelD0RICHPID, int);                     //!
+DECLARE_SOA_COLUMN(IsSelD0TOFplusRICHPID, isSelD0TOFplusRICHPID, int);       //!
 DECLARE_SOA_COLUMN(IsSelD0barTOFplusRICHPID, isSelD0barTOFplusRICHPID, int); //!
 } // namespace hf_selcandidate_d0_ALICE3_Barrel
 DECLARE_SOA_TABLE(HFSelD0CandidateALICE3Barrel, "AOD", "HFSELD0CANDA3B", //!
@@ -216,13 +216,13 @@ DECLARE_SOA_TABLE(HFSelChicToJpsiGammaCandidate, "AOD", "HFSELCHICCAND", //!
 
 namespace hf_selcandidate_xic
 {
-DECLARE_SOA_COLUMN(IsSelXicToPKPi, isSelXicToPKPi, int); //!
-DECLARE_SOA_COLUMN(IsSelXicToPiKP, isSelXicToPiKP, int); //!
+DECLARE_SOA_COLUMN(IsSelXicToPKPi, isSelXicToPKPi, int);     //!
+DECLARE_SOA_COLUMN(IsSelXicToPiKP, isSelXicToPiKP, int);     //!
 DECLARE_SOA_COLUMN(IsSelXicToXiPiPi, isSelXicToXiPiPi, int); //!
 DECLARE_SOA_COLUMN(IsSelXicToPiPiXi, isSelXicToPiPiXi, int); //!
 } // namespace hf_selcandidate_xic
 DECLARE_SOA_TABLE(HFSelXicCandidate, "AOD", "HFSELXICCAND", //!
-                  hf_selcandidate_xic::IsSelXicToPKPi, 
+                  hf_selcandidate_xic::IsSelXicToPKPi,
                   hf_selcandidate_xic::IsSelXicToPiKP,
                   hf_selcandidate_xic::IsSelXicToXiPiPi,
                   hf_selcandidate_xic::IsSelXicToPiPiXi);

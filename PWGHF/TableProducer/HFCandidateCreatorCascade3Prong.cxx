@@ -29,7 +29,6 @@ using namespace o2::framework;
 using namespace o2::aod::hf_cand;
 using namespace o2::aod::hf_cand_casc_prong3;
 
-
 void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 {
   ConfigParamSpec optionDoMC{"doMC", VariantType::Bool, true, {"Perform MC matching."}};
@@ -42,7 +41,7 @@ void customize(std::vector<o2::framework::ConfigParamSpec>& workflowOptions)
 struct HFCandidateCreatorCascade3Prong {
   Produces<aod::HfCandCascProng3Base> rowCandidateBase;
 
-  //Configurable<double> magneticField{"d_bz", 5., "magnetic field"};
+   //Configurable<double> magneticField{"d_bz", 5., "magnetic field"};
   Configurable<bool> b_propdca{"b_propdca", true, "create tracks version propagated to PCA"};
   Configurable<double> d_maxr{"d_maxr", 200., "reject PCA's above this radius"};
   Configurable<double> d_maxdzini{"d_maxdzini", 4., "reject (if>0) PCA candidate if tracks DZ exceeds threshold"};
@@ -67,23 +66,23 @@ struct HFCandidateCreatorCascade3Prong {
   o2::base::MatLayerCylSet* lut;
   o2::base::Propagator::MatCorrType matCorr = o2::base::Propagator::MatCorrType::USEMatCorrLUT;
   int runNumber;
-  
+
   float toMicrometers = 10000.; // from cm to µm
 
   double massPi = RecoDecay::getMassPDG(kPiPlus);
   double massXi = RecoDecay::getMassPDG(kXiMinus);
   double massXiPiPi{0.};
-  double magneticField = 0.;
+  double magneticField = 5.;
 
   void init(InitContext const&)
   {
-    ccdb->setURL(ccdbUrl);
+    /*ccdb->setURL(ccdbUrl);
     ccdb->setCaching(true);
     ccdb->setLocalObjectValidityChecking();
     lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->get<o2::base::MatLayerCylSet>(ccdbPathLut));
     if (!o2::base::GeometryManager::isGeometryLoaded()) {
       ccdb->get<TGeoManager>(ccdbPathGeo);
-    }
+    }*/
     runNumber = 0;
   }
 
@@ -96,7 +95,7 @@ struct HFCandidateCreatorCascade3Prong {
   {
     // 3-prong vertex fitter
     o2::vertexing::DCAFitterN<3> df;
-    //df.setBz(magneticField);
+    //df.setBz(d_bz);
     df.setPropagateToPCA(b_propdca);
     df.setMaxR(d_maxr);
     df.setMaxDZIni(d_maxdzini);
@@ -107,7 +106,7 @@ struct HFCandidateCreatorCascade3Prong {
     // loop over triplets of track indices
     for (const auto& rowTrackIndexProng3 : rowsTrackIndexProng3) {
 
-            //for (auto& casc : cascades) {
+      // for (auto& casc : cascades) {
       auto casc = rowTrackIndexProng3.cascade_as<aod::CascDataExt>();
       if (!casc.has_v0()) {
         continue;
@@ -124,14 +123,14 @@ struct HFCandidateCreatorCascade3Prong {
       /// The static instance of the propagator was already modified in the HFTrackIndexSkimCreator,
       /// but this is not true when running on Run2 data/MC already converted into AO2Ds.
       auto bc = track0.collision().bc_as<aod::BCsWithTimestamps>();
-      if (runNumber != bc.runNumber()) {
+      /*if (runNumber != bc.runNumber()) {
         LOG(info) << ">>>>>>>>>>>> Current run number: " << runNumber;
         initCCDB(bc, runNumber, ccdb, isRun2 ? ccdbPathGrp : ccdbPathGrpMag, lut, isRun2);
         magneticField = o2::base::Propagator::Instance()->getNominalBz();
         LOG(info) << ">>>>>>>>>>>> Magnetic field: " << magneticField;
         // df.setBz(magneticField); /// put it outside the 'if'! Otherwise we have a difference wrt bz Configurable (< 1 permille) in Run2 conv. data
         // df.print();
-      }
+      }*/
       df.setBz(magneticField);
 
       auto trackV0DaughPos = v0.posTrack_as<aod::BigTracksExtended>();
@@ -142,11 +141,10 @@ struct HFCandidateCreatorCascade3Prong {
       auto trackParVar1 = getTrackParCov(track1);
       auto collision = track0.collision();
 
-      auto charge = -1; 
+      auto charge = -1;
       if (bachTrackCascade.signed1Pt() > 0) {
-        charge = +1; 
-      } 
-
+        charge = +1;
+      }
 
       o2::vertexing::DCAFitterN<2> fitterV0, fitterCasc;
       fitterV0.setBz(magneticField);
@@ -164,94 +162,91 @@ struct HFCandidateCreatorCascade3Prong {
       fitterCasc.setMinParamChange(d_minparamchange);
       fitterCasc.setMinRelChi2Change(d_minrelchi2change);
       fitterCasc.setUseAbsDCA(true);
-            
-            std::array<float, 3> posCascade = {0.};
-            std::array<float, 3> pvecpos = {0.};
-            std::array<float, 3> pvecneg = {0.};
-            std::array<float, 3> pvecBach = {0.};
-            
-            auto trackParCovV0DaughPos = getTrackParCov(trackV0DaughPos);
-            trackParCovV0DaughPos.propagateTo(v0.posX(), magneticField); // propagate the track to the X closest to the V0 vertex
-            auto trackParCovV0DaughNeg = getTrackParCov(trackV0DaughNeg);
-            trackParCovV0DaughNeg.propagateTo(v0.negX(), magneticField); // propagate the track to the X closest to the V0 vertex
-            
-            // Acquire basic tracks
-            auto pTrack = getTrackParCov(trackV0DaughPos);
-            auto nTrack = getTrackParCov(trackV0DaughNeg);
-            auto bTrack = getTrackParCov(bachTrackCascade);
-            
-            int nCandV0 = fitterV0.process(pTrack, nTrack);
-            if (nCandV0 == 0) {
-              continue;
-            }
-            fitterV0.propagateTracksToVertex();
-            const auto& v0vtx = fitterV0.getPCACandidate();
-            
-            // Covariance matrix calculation
-            std::array<float, 21> cov0 = {0};
-            std::array<float, 21> cov1 = {0};
-            std::array<float, 21> covV0 = {0};
 
-            const int momInd[6] = {9, 13, 14, 18, 19, 20}; // cov matrix elements for momentum component
-            fitterV0.getTrack(0).getPxPyPzGlo(pvecpos);
-            fitterV0.getTrack(1).getPxPyPzGlo(pvecneg);
-            fitterV0.getTrack(0).getCovXYZPxPyPzGlo(cov0);
-            fitterV0.getTrack(1).getCovXYZPxPyPzGlo(cov1);
-            
-            const std::array<float, 3> posV0 = {(float)v0vtx[0], (float)v0vtx[1], (float)v0vtx[2]};
-            const std::array<float, 3> pvecV0 = {pvecpos[0] + pvecneg[0], pvecpos[1] + pvecneg[1], pvecpos[2] + pvecneg[2]};
-            
-            for (int i = 0; i < 6; i++) {
-              int j = momInd[i]; 
-              covV0[j] = cov0[j] + cov1[j];
-            }
-            auto covVtxV0 = fitterV0.calcPCACovMatrix();
-            covV0[0] = covVtxV0(0, 0);
-            covV0[1] = covVtxV0(1, 0);
-            covV0[2] = covVtxV0(1, 1);
-            covV0[3] = covVtxV0(2, 0);
-            covV0[4] = covVtxV0(2, 1);
-            covV0[5] = covVtxV0(2, 2);
-            
-            // we build the neutral track to then build the cascade
-            auto trackV0 = o2::track::TrackParCov(posV0, pvecV0, covV0, 0);
-            trackV0.setQ2Pt(0); // No bending, please
-            
-            int nCandCasc = fitterCasc.process(trackV0, bTrack);
-            if (nCandCasc == 0) {
-              continue;
-            }
-            fitterCasc.propagateTracksToVertex();
-            const auto& cascvtx = fitterCasc.getPCACandidate(); 
-            posCascade = {(float)cascvtx[0], (float)cascvtx[1], (float)cascvtx[2]};
-            
-            fitterCasc.getTrack(1).getPxPyPzGlo(pvecBach);
-            std::array<float, 3> pvecCascade = {pvecV0[0] + pvecBach[0], pvecV0[1] + pvecBach[1], pvecV0[2] + pvecBach[2]};
-            
-            // Covariance matrix calculation for cascade
-            std::array<float, 21> cov2 = {0};
-            std::array<float, 21> cov3 = {0};
-            std::array<float, 21> covCascade = {0};
-            
-            fitterCasc.getTrack(0).getCovXYZPxPyPzGlo(cov2);
-            fitterCasc.getTrack(1).getCovXYZPxPyPzGlo(cov3);
-            for (int i = 0; i < 6; i++) {
-              int j = momInd[i];
-              covCascade[j] = cov2[j] + cov3[j];
-            }
-            auto covVtxCascade = fitterCasc.calcPCACovMatrix();
-            covCascade[0] = covVtxCascade(0, 0);
-            covCascade[1] = covVtxCascade(1, 0);
-            covCascade[2] = covVtxCascade(1, 1);
-            covCascade[3] = covVtxCascade(2, 0);
-            covCascade[4] = covVtxCascade(2, 1);
-            covCascade[5] = covVtxCascade(2, 2);
-            
-            auto trackCascade = o2::track::TrackParCov(posCascade, pvecCascade, covCascade, 0);
-            trackCascade.setQ2Pt(0); // FIXME not sure if this is needed
+      std::array<float, 3> posCascade = {0.};
+      std::array<float, 3> pvecpos = {0.};
+      std::array<float, 3> pvecneg = {0.};
+      std::array<float, 3> pvecBach = {0.};
 
+      auto trackParCovV0DaughPos = getTrackParCov(trackV0DaughPos);
+      trackParCovV0DaughPos.propagateTo(v0.posX(), magneticField); // propagate the track to the X closest to the V0 vertex
+      auto trackParCovV0DaughNeg = getTrackParCov(trackV0DaughNeg);
+      trackParCovV0DaughNeg.propagateTo(v0.negX(), magneticField); // propagate the track to the X closest to the V0 vertex
 
+      // Acquire basic tracks
+      auto pTrack = getTrackParCov(trackV0DaughPos);
+      auto nTrack = getTrackParCov(trackV0DaughNeg);
+      auto bTrack = getTrackParCov(bachTrackCascade);
 
+      int nCandV0 = fitterV0.process(pTrack, nTrack);
+      if (nCandV0 == 0) {
+        continue;
+      }
+      fitterV0.propagateTracksToVertex();
+      const auto& v0vtx = fitterV0.getPCACandidate();
+
+      // Covariance matrix calculation
+      std::array<float, 21> cov0 = {0};
+      std::array<float, 21> cov1 = {0};
+      std::array<float, 21> covV0 = {0};
+
+      const int momInd[6] = {9, 13, 14, 18, 19, 20}; // cov matrix elements for momentum component
+      fitterV0.getTrack(0).getPxPyPzGlo(pvecpos);
+      fitterV0.getTrack(1).getPxPyPzGlo(pvecneg);
+      fitterV0.getTrack(0).getCovXYZPxPyPzGlo(cov0);
+      fitterV0.getTrack(1).getCovXYZPxPyPzGlo(cov1);
+
+      const std::array<float, 3> posV0 = {(float)v0vtx[0], (float)v0vtx[1], (float)v0vtx[2]};
+      const std::array<float, 3> pvecV0 = {pvecpos[0] + pvecneg[0], pvecpos[1] + pvecneg[1], pvecpos[2] + pvecneg[2]};
+
+      for (int i = 0; i < 6; i++) {
+        int j = momInd[i];
+        covV0[j] = cov0[j] + cov1[j];
+      }
+      auto covVtxV0 = fitterV0.calcPCACovMatrix();
+      covV0[0] = covVtxV0(0, 0);
+      covV0[1] = covVtxV0(1, 0);
+      covV0[2] = covVtxV0(1, 1);
+      covV0[3] = covVtxV0(2, 0);
+      covV0[4] = covVtxV0(2, 1);
+      covV0[5] = covVtxV0(2, 2);
+
+      // we build the neutral track to then build the cascade
+      auto trackV0 = o2::track::TrackParCov(posV0, pvecV0, covV0, 0);
+      trackV0.setQ2Pt(0); // No bending, please
+
+      int nCandCasc = fitterCasc.process(trackV0, bTrack);
+      if (nCandCasc == 0) {
+        continue;
+      }
+      fitterCasc.propagateTracksToVertex();
+      const auto& cascvtx = fitterCasc.getPCACandidate();
+      posCascade = {(float)cascvtx[0], (float)cascvtx[1], (float)cascvtx[2]};
+
+      fitterCasc.getTrack(1).getPxPyPzGlo(pvecBach);
+      std::array<float, 3> pvecCascade = {pvecV0[0] + pvecBach[0], pvecV0[1] + pvecBach[1], pvecV0[2] + pvecBach[2]};
+
+      // Covariance matrix calculation for cascade
+      std::array<float, 21> cov2 = {0};
+      std::array<float, 21> cov3 = {0};
+      std::array<float, 21> covCascade = {0};
+
+      fitterCasc.getTrack(0).getCovXYZPxPyPzGlo(cov2);
+      fitterCasc.getTrack(1).getCovXYZPxPyPzGlo(cov3);
+      for (int i = 0; i < 6; i++) {
+        int j = momInd[i];
+        covCascade[j] = cov2[j] + cov3[j];
+      }
+      auto covVtxCascade = fitterCasc.calcPCACovMatrix();
+      covCascade[0] = covVtxCascade(0, 0);
+      covCascade[1] = covVtxCascade(1, 0);
+      covCascade[2] = covVtxCascade(1, 1);
+      covCascade[3] = covVtxCascade(2, 0);
+      covCascade[4] = covVtxCascade(2, 1);
+      covCascade[5] = covVtxCascade(2, 2);
+
+      auto trackCascade = o2::track::TrackParCov(posCascade, pvecCascade, covCascade, 0);
+      trackCascade.setQ2Pt(0); // FIXME not sure if this is needed
 
       if (df.process(trackParVar0, trackParVar1, trackCascade) == 0) {
         continue;
@@ -312,7 +307,10 @@ struct HFCandidateCreatorCascade3Prong {
                        impactParameter0.getY(), impactParameter1.getY(), impactParameter2.getY(),
                        std::sqrt(impactParameter0.getSigmaY2()), std::sqrt(impactParameter1.getSigmaY2()), std::sqrt(impactParameter2.getSigmaY2()),
                        rowTrackIndexProng3.cascadeId(), rowTrackIndexProng3.index0Id(), rowTrackIndexProng3.index1Id(),
-                       charge,
+                       charge, posCascade[0], posCascade[1], posCascade[2], posV0[0], posV0[1], posV0[2],
+                       pvecpos[0], pvecpos[1], pvecpos[2],
+                       pvecneg[0], pvecneg[1], pvecneg[2],
+                       pvecBach[0], pvecBach[1], pvecBach[2],
                        fitterV0.getChi2AtPCACandidate(), fitterCasc.getChi2AtPCACandidate(),
                        trackV0DaughPos.dcaXY(),
                        trackV0DaughNeg.dcaXY(),
@@ -336,7 +334,7 @@ struct HFCandidateCreatorCascade3ProngExpressions {
   Produces<aod::HfCandCascProng3MCRec> rowMCMatchRec;
   Produces<aod::HfCandCascProng3MCGen> rowMCMatchGen;
 
-  Spawns<aod::HfCandCascProng3Ext> rowCandidateProng3;
+  // Spawns<aod::HfCandCascProng3Ext> rowCandidateProng3;
   void init(InitContext const&) {}
 
   /// Performs MC matching.
@@ -345,7 +343,7 @@ struct HFCandidateCreatorCascade3ProngExpressions {
                  aod::CascDataExt const&,
                  aod::McParticles const& particlesMC)
   {
-    rowCandidateProng3->bindExternalIndices(&tracks);
+    // rowCandidateProng3->bindExternalIndices(&tracks);
     int indexRec = -1;
     int8_t sign = 0;
     int8_t flag = 0;
@@ -357,7 +355,7 @@ struct HFCandidateCreatorCascade3ProngExpressions {
       // Printf("New rec. candidate");
       flag = 0;
       origin = 0;
-      //auto XiTrack = candidate.cascade_as();
+      // auto XiTrack = candidate.cascade_as();
       auto arrayDaughters = array{candidate.cascade_as<aod::BigTracksMC>(), candidate.index0_as<aod::BigTracksMC>(), candidate.index1_as<aod::BigTracksMC>()};
 
       // Ξc± → Ξ∓ π± π±
@@ -403,6 +401,6 @@ struct HFCandidateCreatorCascade3ProngExpressions {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<HFCandidateCreatorCascade3Prong>(cfgc, TaskName{"hf-cand-creator-cascade-3prong"})
+    adaptAnalysisTask<HFCandidateCreatorCascade3Prong>(cfgc, TaskName{"hf-cand-creator-cascade-3prong"}),
     adaptAnalysisTask<HFCandidateCreatorCascade3ProngExpressions>(cfgc, TaskName{"hf-cand-creator-cascade-3prong-expressions"})};
 }

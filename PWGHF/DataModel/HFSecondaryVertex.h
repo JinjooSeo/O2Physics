@@ -900,31 +900,85 @@ DECLARE_SOA_TABLE(HfCandProng3MCGen, "AOD", "HFCANDP3MCGEN", //!
                   hf_cand_prong3::OriginMCGen,
                   hf_cand_prong3::FlagMCDecayChanGen);
 
-
 namespace hf_cand_casc_prong3
 {
-DECLARE_SOA_EXPRESSION_COLUMN(Px, px, //!
+// General cascade properties: position, momentum
+DECLARE_SOA_COLUMN(Sign, sign, int);           //!
+DECLARE_SOA_COLUMN(PxPos, pxpos, float);       //!
+DECLARE_SOA_COLUMN(PyPos, pypos, float);       //!
+DECLARE_SOA_COLUMN(PzPos, pzpos, float);       //!
+DECLARE_SOA_COLUMN(PxNeg, pxneg, float);       //!
+DECLARE_SOA_COLUMN(PyNeg, pyneg, float);       //!
+DECLARE_SOA_COLUMN(PzNeg, pzneg, float);       //!
+DECLARE_SOA_COLUMN(PxBach, pxbach, float);     //!
+DECLARE_SOA_COLUMN(PyBach, pybach, float);     //!
+DECLARE_SOA_COLUMN(PzBach, pzbach, float);     //!
+DECLARE_SOA_COLUMN(Xcascade, xcascade, float); //!
+DECLARE_SOA_COLUMN(Ycascade, ycascade, float); //!
+DECLARE_SOA_COLUMN(Zcascade, zcascade, float); //!
+DECLARE_SOA_COLUMN(Xlambda, xlambda, float);   //!
+DECLARE_SOA_COLUMN(Ylambda, ylambda, float);   //!
+DECLARE_SOA_COLUMN(Zlambda, zlambda, float);   //!
+// Saved from finding: DCAs
+DECLARE_SOA_COLUMN(DCAV0Daughters, dcaV0daughters, float);     //!
+DECLARE_SOA_COLUMN(DCACascDaughters, dcacascdaughters, float); //!
+DECLARE_SOA_COLUMN(DCAPosToPV, dcapostopv, float);             //!
+DECLARE_SOA_COLUMN(DCANegToPV, dcanegtopv, float);             //!
+DECLARE_SOA_COLUMN(DCABachToPV, dcabachtopv, float);           //!
+DECLARE_SOA_EXPRESSION_COLUMN(Px, px,                          //!
                               float, 1.f * aod::hf_cand::pxProng0 + 1.f * aod::hf_cand::pxProng1 + 1.f * aod::hf_cand::pxProng2);
 DECLARE_SOA_EXPRESSION_COLUMN(Py, py, //!
                               float, 1.f * aod::hf_cand::pyProng0 + 1.f * aod::hf_cand::pyProng1 + 1.f * aod::hf_cand::pyProng2);
 DECLARE_SOA_EXPRESSION_COLUMN(Pz, pz, //!
                               float, 1.f * aod::hf_cand::pzProng0 + 1.f * aod::hf_cand::pzProng1 + 1.f * aod::hf_cand::pzProng2);
+DECLARE_SOA_EXPRESSION_COLUMN(PxLambda, pxlambda, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pxpos + 1.f * aod::hf_cand_casc_prong3::pxneg);
+DECLARE_SOA_EXPRESSION_COLUMN(PyLambda, pylambda, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pypos + 1.f * aod::hf_cand_casc_prong3::pyneg);
+DECLARE_SOA_EXPRESSION_COLUMN(PzLambda, pzlambda, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pzpos + 1.f * aod::hf_cand_casc_prong3::pzneg);
+DECLARE_SOA_EXPRESSION_COLUMN(PxCascade, pxcascade, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pxpos + 1.f * aod::hf_cand_casc_prong3::pxneg + 1.f * aod::hf_cand_casc_prong3::pxbach);
+DECLARE_SOA_EXPRESSION_COLUMN(PyCascade, pycascade, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pypos + 1.f * aod::hf_cand_casc_prong3::pyneg + 1.f * aod::hf_cand_casc_prong3::pybach);
+DECLARE_SOA_EXPRESSION_COLUMN(PzCascade, pzcascade, //!
+                              float, 1.f * aod::hf_cand_casc_prong3::pzpos + 1.f * aod::hf_cand_casc_prong3::pzneg + 1.f * aod::hf_cand_casc_prong3::pzbach);
 DECLARE_SOA_DYNAMIC_COLUMN(M, m, //!
                            [](float px0, float py0, float pz0, float px1, float py1, float pz1, float px2, float py2, float pz2, const array<double, 3>& m) -> float { return RecoDecay::m(array{array{px0, py0, pz0}, array{px1, py1, pz1}, array{px2, py2, pz2}}, m); });
 DECLARE_SOA_DYNAMIC_COLUMN(M2, m2, //!
                            [](float px0, float py0, float pz0, float px1, float py1, float pz1, float px2, float py2, float pz2, const array<double, 3>& m) -> float { return RecoDecay::m2(array{array{px0, py0, pz0}, array{px1, py1, pz1}, array{px2, py2, pz2}}, m); });
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProngSqSum, impactParameterProngSqSum, //!
                            [](float impParProng0, float impParProng1, float impParProng2) -> float { return RecoDecay::sumOfSquares(impParProng0, impParProng1, impParProng2); });
-DECLARE_SOA_DYNAMIC_COLUMN(MaxNormalisedDeltaIP, maxNormalisedDeltaIP, //! 
+DECLARE_SOA_DYNAMIC_COLUMN(MaxNormalisedDeltaIP, maxNormalisedDeltaIP, //!
                            [](float xVtxP, float yVtxP, float xVtxS, float yVtxS, float errDlxy, float pxM, float pyM, float ip0, float errIp0, float ip1, float errIp1, float ip2, float errIp2, float px0, float py0, float px1, float py1, float px2, float py2) -> float { return RecoDecay::maxNormalisedDeltaIP(array{xVtxP, yVtxP}, array{xVtxS, yVtxS}, errDlxy, array{pxM, pyM}, array{ip0, ip1, ip2}, array{errIp0, errIp1, errIp2}, array{array{px0, py0}, array{px1, py1}, array{px2, py2}}); });
+// Length quantities
+DECLARE_SOA_DYNAMIC_COLUMN(V0Radius, v0radius, //!
+                           [](float xlambda, float ylambda) -> float { return RecoDecay::sqrtSumOfSquares(xlambda, ylambda); });
+DECLARE_SOA_DYNAMIC_COLUMN(CascRadius, cascradius, //!
+                           [](float x, float y) -> float { return RecoDecay::sqrtSumOfSquares(x, y); });
+// CosPAs
 DECLARE_SOA_DYNAMIC_COLUMN(V0CosPA, v0cosPA, //!
                            [](float Xlambda, float Ylambda, float Zlambda, float PxLambda, float PyLambda, float PzLambda, float pvX, float pvY, float pvZ) -> float { return RecoDecay::cpa(array{pvX, pvY, pvZ}, array{Xlambda, Ylambda, Zlambda}, array{PxLambda, PyLambda, PzLambda}); });
 DECLARE_SOA_DYNAMIC_COLUMN(CascCosPA, casccosPA, //!
                            [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return RecoDecay::cpa(array{pvX, pvY, pvZ}, array{X, Y, Z}, array{Px, Py, Pz}); });
 DECLARE_SOA_DYNAMIC_COLUMN(DCAV0ToPV, dcav0topv, //!
                            [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return std::sqrt((std::pow((pvY - Y) * Pz - (pvZ - Z) * Py, 2) + std::pow((pvX - X) * Pz - (pvZ - Z) * Px, 2) + std::pow((pvX - X) * Py - (pvY - Y) * Px, 2)) / (Px * Px + Py * Py + Pz * Pz)); });
-DECLARE_SOA_DYNAMIC_COLUMN(DCACascToPV, dcacasctopv, //! 
+DECLARE_SOA_DYNAMIC_COLUMN(DCACascToPV, dcacasctopv, //!
                            [](float X, float Y, float Z, float Px, float Py, float Pz, float pvX, float pvY, float pvZ) -> float { return std::sqrt((std::pow((pvY - Y) * Pz - (pvZ - Z) * Py, 2) + std::pow((pvX - X) * Pz - (pvZ - Z) * Px, 2) + std::pow((pvX - X) * Py - (pvY - Y) * Px, 2)) / (Px * Px + Py * Py + Pz * Pz)); });
+// Calculated on the fly with mass assumption + dynamic tables
+DECLARE_SOA_DYNAMIC_COLUMN(MLambda, mLambda, //!
+                           [](int charge, float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) -> float { return RecoDecay::m(array{array{pxpos, pypos, pzpos}, array{pxneg, pyneg, pzneg}}, charge < 0 ? array{RecoDecay::getMassPDG(kProton), RecoDecay::getMassPDG(kPiPlus)} : array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kProton)}); });
+// Calculated on the fly with mass assumption + dynamic tables
+DECLARE_SOA_DYNAMIC_COLUMN(MXi, mXi, //!
+                           [](float pxbach, float pybach, float pzbach, float PxLambda, float PyLambda, float PzLambda) -> float { return RecoDecay::m(array{array{pxbach, pybach, pzbach}, array{PxLambda, PyLambda, PzLambda}}, array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kLambda0)}); });
+DECLARE_SOA_DYNAMIC_COLUMN(MOmega, mOmega, //!
+                           [](float pxbach, float pybach, float pzbach, float PxLambda, float PyLambda, float PzLambda) -> float { return RecoDecay::m(array{array{pxbach, pybach, pzbach}, array{PxLambda, PyLambda, PzLambda}}, array{RecoDecay::getMassPDG(kKPlus), RecoDecay::getMassPDG(kLambda0)}); });
+DECLARE_SOA_DYNAMIC_COLUMN(YXi, yXi, //!
+                           [](float Px, float Py, float Pz) -> float { return RecoDecay::y(array{Px, Py, Pz}, 1.32171); });
+DECLARE_SOA_DYNAMIC_COLUMN(YOmega, yOmega, //!
+                           [](float Px, float Py, float Pz) -> float { return RecoDecay::y(array{Px, Py, Pz}, 1.67245); });
+DECLARE_SOA_DYNAMIC_COLUMN(Eta, eta, //!
+                           [](float Px, float Py, float Pz) -> float { return RecoDecay::eta(array{Px, Py, Pz}); });
 
 // MC matching result:
 DECLARE_SOA_COLUMN(FlagMCMatchRec, flagMCMatchRec, int8_t);         //! reconstruction level
@@ -972,7 +1026,7 @@ auto InvMassXicbar(const T& candidate)
   return candidate.m(array{RecoDecay::getMassPDG(kPiPlus), RecoDecay::getMassPDG(kXiMinus), RecoDecay::getMassPDG(kPiPlus)});
 }
 
-} // namespace hf_cand_casc_prong3
+} // namespace hf_cand_casc_prong3:q!
 
 // 3-prong cascade decay candidate table
 DECLARE_SOA_TABLE(HfCandCascProng3Base, "AOD", "HFCANDCP3BASE", //!
@@ -986,14 +1040,32 @@ DECLARE_SOA_TABLE(HfCandCascProng3Base, "AOD", "HFCANDCP3BASE", //!
                   hf_cand::ImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ImpactParameter2,
                   hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1, hf_cand::ErrorImpactParameter2,
                   hf_track_index::CascadeId, hf_track_index::Index0Id, hf_track_index::Index1Id,
-                  cascdata::Sign,
-                  cascdata::DCAV0Daughters, cascdata::DCACascDaughters,
-                  cascdata::DCAPosToPV, cascdata::DCANegToPV, cascdata::DCABachToPV,
+                  hf_cand_casc_prong3::Sign, hf_cand_casc_prong3::Xcascade, hf_cand_casc_prong3::Ycascade, hf_cand_casc_prong3::Zcascade,
+                  hf_cand_casc_prong3::Xlambda, hf_cand_casc_prong3::Ylambda, hf_cand_casc_prong3::Zlambda,
+                  hf_cand_casc_prong3::PxPos, hf_cand_casc_prong3::PyPos, hf_cand_casc_prong3::PzPos,
+                  hf_cand_casc_prong3::PxNeg, hf_cand_casc_prong3::PyNeg, hf_cand_casc_prong3::PzNeg,
+                  hf_cand_casc_prong3::PxBach, hf_cand_casc_prong3::PyBach, hf_cand_casc_prong3::PzBach,
+                  hf_cand_casc_prong3::DCAV0Daughters, hf_cand_casc_prong3::DCACascDaughters,
+                  hf_cand_casc_prong3::DCAPosToPV, hf_cand_casc_prong3::DCANegToPV, hf_cand_casc_prong3::DCABachToPV,
                   hf_track_index::HFflag,
                   /* dynamic columns */
                   hf_cand_casc_prong3::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
                   hf_cand_casc_prong3::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2>,
                   hf_cand_casc_prong3::ImpactParameterProngSqSum<hf_cand::ImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ImpactParameter2>,
+                  /* dynamic columns for cascade*/
+                  hf_cand_casc_prong3::V0Radius<hf_cand_casc_prong3::Xlambda, hf_cand_casc_prong3::Ylambda>,
+                  hf_cand_casc_prong3::CascRadius<hf_cand_casc_prong3::Xcascade, hf_cand_casc_prong3::Ycascade>,
+                  hf_cand_casc_prong3::V0CosPA<hf_cand_casc_prong3::Xlambda, hf_cand_casc_prong3::Ylambda, hf_cand_casc_prong3::Zlambda, hf_cand_casc_prong3::PxLambda, hf_cand_casc_prong3::PyLambda, hf_cand_casc_prong3::PzLambda>,
+                  hf_cand_casc_prong3::CascCosPA<hf_cand_casc_prong3::Xcascade, hf_cand_casc_prong3::Ycascade, hf_cand_casc_prong3::Zcascade, hf_cand_casc_prong3::PxCascade, hf_cand_casc_prong3::PyCascade, hf_cand_casc_prong3::PzCascade>,
+                  hf_cand_casc_prong3::DCAV0ToPV<hf_cand_casc_prong3::Xlambda, hf_cand_casc_prong3::Ylambda, hf_cand_casc_prong3::Zlambda, hf_cand_casc_prong3::PxLambda, hf_cand_casc_prong3::PyLambda, hf_cand_casc_prong3::PzLambda>,
+                  hf_cand_casc_prong3::DCACascToPV<hf_cand_casc_prong3::Xcascade, hf_cand_casc_prong3::Ycascade, hf_cand_casc_prong3::Zcascade, hf_cand_casc_prong3::PxCascade, hf_cand_casc_prong3::PyCascade, hf_cand_casc_prong3::PzCascade>,
+                  // Invariant masses
+                  hf_cand_casc_prong3::MLambda<hf_cand_casc_prong3::Sign, hf_cand_casc_prong3::PxPos, hf_cand_casc_prong3::PyPos, hf_cand_casc_prong3::PzPos, hf_cand_casc_prong3::PxNeg, hf_cand_casc_prong3::PyNeg, hf_cand_casc_prong3::PzNeg>,
+                  hf_cand_casc_prong3::MXi<hf_cand_casc_prong3::PxBach, hf_cand_casc_prong3::PyBach, hf_cand_casc_prong3::PzBach, hf_cand_casc_prong3::PxLambda, hf_cand_casc_prong3::PyLambda, hf_cand_casc_prong3::PzLambda>,
+                  hf_cand_casc_prong3::MOmega<hf_cand_casc_prong3::PxBach, hf_cand_casc_prong3::PyBach, hf_cand_casc_prong3::PzBach, hf_cand_casc_prong3::PxLambda, hf_cand_casc_prong3::PyLambda, hf_cand_casc_prong3::PzLambda>,
+                  // Longitudinal
+                  hf_cand_casc_prong3::YXi<hf_cand_casc_prong3::PxCascade, hf_cand_casc_prong3::PyCascade, hf_cand_casc_prong3::PzCascade>,
+                  hf_cand_casc_prong3::YOmega<hf_cand_casc_prong3::PxCascade, hf_cand_casc_prong3::PyCascade, hf_cand_casc_prong3::PzCascade>,
                   /* prong 2 */
                   hf_cand::ImpactParameterNormalised2<hf_cand::ImpactParameter2, hf_cand::ErrorImpactParameter2>,
                   hf_cand::PtProng2<hf_cand::PxProng2, hf_cand::PyProng2>,
@@ -1018,7 +1090,9 @@ DECLARE_SOA_TABLE(HfCandCascProng3Base, "AOD", "HFCANDCP3BASE", //!
 
 // extended table with expression columns that can be used as arguments of dynamic columns
 DECLARE_SOA_EXTENDED_TABLE_USER(HfCandCascProng3Ext, HfCandCascProng3Base, "HFCANDCP3EXT", //!
-                                hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz);
+                                hf_cand_casc_prong3::Px, hf_cand_casc_prong3::Py, hf_cand_casc_prong3::Pz,
+                                hf_cand_casc_prong3::PxLambda, hf_cand_casc_prong3::PyLambda, hf_cand_casc_prong3::PzLambda,
+                                hf_cand_casc_prong3::PxCascade, hf_cand_casc_prong3::PyCascade, hf_cand_casc_prong3::PzCascade);
 
 using HfCandCascProng3 = HfCandCascProng3Ext;
 

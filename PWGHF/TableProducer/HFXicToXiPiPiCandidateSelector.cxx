@@ -41,8 +41,8 @@ struct HFXicToXiPiPiCandidateSelector {
   Configurable<double> d_pidTPCMaxpT{"d_pidTPCMaxpT", 20, "Upper bound of track pT for TPC PID"};
   Configurable<double> d_nSigmaTPC{"d_nSigmaTPC", 3., "Nsigma cut on TPC only"};
   Configurable<double> d_nSigmaTPCCombined{"d_nSigmaTPCCombined", 5., "Nsigma cut on TPC combined with TOF"};
-  //Configurable<double> d_TPCNClsFindablePIDCut{"d_TPCNClsFindablePIDCut", 70., "Lower bound of TPC findable clusters for good PID"};
-  // TOF
+  // Configurable<double> d_TPCNClsFindablePIDCut{"d_TPCNClsFindablePIDCut", 70., "Lower bound of TPC findable clusters for good PID"};
+  //  TOF
   Configurable<double> d_pidTOFMinpT{"d_pidTOFMinpT", 0.15, "Lower bound of track pT for TOF PID"};
   Configurable<double> d_pidTOFMaxpT{"d_pidTOFMaxpT", 20, "Upper bound of track pT for TOF PID"};
   Configurable<double> d_nSigmaTOF{"d_nSigmaTOF", 3., "Nsigma cut on TOF only"};
@@ -86,15 +86,14 @@ struct HFXicToXiPiPiCandidateSelector {
       return false;
     }
 
-    //if (candidate.v0radius() < cuts->get(pTBin, "v0radius")) {
-    //  return false;
-    //}
+    if (candidate.v0radius() < cuts->get(pTBin, "v0radius")) {
+      return false;
+    }
 
-    //if (TMath::Abs(candidate.mLambda() - RecoDecay::getMassPDG(kLambda0)) > cuts->get(pTBin, "v0masswindow")) {
-    //  return false;
-    //}
+    if (TMath::Abs(candidate.mLambda() - RecoDecay::getMassPDG(kLambda0)) > cuts->get(pTBin, "v0masswindow")) {
+      return false;
+    }
 
-    // Topology selection for V0
     //if (candidate.casccosPA() < cuts->get(pTBin, "Casc CosPA")) {
     //  return false;
     //}
@@ -107,13 +106,13 @@ struct HFXicToXiPiPiCandidateSelector {
       return false;
     }
 
-    //if (candidate.cascradius() < cuts->get(pTBin, "cascradius")) {
-    //  return false;
-   //}
+    if (candidate.cascradius() < cuts->get(pTBin, "cascradius")) {
+      return false;
+    }
 
-    //if (TMath::Abs(candidate.mXi() - RecoDecay::getMassPDG(kXiMinus)) > cuts->get(pTBin, "cascmasswindow")) {
-    //  return false;
-    //}
+    if (TMath::Abs(candidate.mXi() - RecoDecay::getMassPDG(kXiMinus)) > cuts->get(pTBin, "cascmasswindow")) {
+      return false;
+    }
 
     // check that the candidate pT is within the analysis range
     if (candpT < d_pTCandMin || candpT >= d_pTCandMax) {
@@ -121,11 +120,11 @@ struct HFXicToXiPiPiCandidateSelector {
     }
 
     // cosine of pointing angle
-    //if (candidate.cpa() <= cuts->get(pTBin, "cos pointing angle")) {
-    //  return false;
-    //}
+    if (candidate.cpa() <= cuts->get(pTBin, "cos pointing angle")) {
+      return false;
+    }
 
-    //candidate chi2PCA
+    // candidate chi2PCA
     if (candidate.chi2PCA() > cuts->get(pTBin, "Chi2PCA")) {
       return false;
     }
@@ -181,7 +180,7 @@ struct HFXicToXiPiPiCandidateSelector {
     selectorPion1.setRangePtTOF(d_pidTOFMinpT, d_pidTOFMaxpT);
     selectorPion1.setRangeNSigmaTOF(-d_nSigmaTOF, d_nSigmaTOF);
     selectorPion1.setRangeNSigmaTOFCondTPC(-d_nSigmaTOFCombined, d_nSigmaTOFCombined);
-    //selectorPion1.setRangePtBayes(d_pidBayesMinpT, d_pidBayesMaxpT);
+    // selectorPion1.setRangePtBayes(d_pidBayesMinpT, d_pidBayesMaxpT);
 
     TrackSelectorPID selectorPion2(selectorPion1);
 
@@ -197,15 +196,15 @@ struct HFXicToXiPiPiCandidateSelector {
         continue;
       }
 
-      const auto& trackPos1 = candidate.index0_as<TrksPID>(); // positive daughter
-      const auto& trackPos2 = candidate.index1_as<TrksPID>(); // positive daughter
+      const auto& trackPos1 = candidate.index0_as<TrksPID>();  // positive daughter
+      const auto& trackPos2 = candidate.index1_as<TrksPID>();  // positive daughter
       const auto& trackCasc = candidate.cascade_as<TrksPID>(); // Cascade daughter (positive for the antiparticles)
 
-      // conjugate-independent topological selection
-      //if (!selectionTopol(candidate)) {
+      // conjugate-independent topological selectione
+      if (!selectionTopol(candidate)) {
         hfSelXicCandidate(0, 0, statusXic, statusXicbar);
-        //continue;
-      //}
+        continue;
+      }
 
       // conjugate-dependent topological selection for Xic
 
