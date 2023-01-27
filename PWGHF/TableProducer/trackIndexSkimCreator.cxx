@@ -2254,22 +2254,23 @@ struct HfTrackIndexSkimCreatorVZero {
     }
   }
 
-  void processNoVZeros(SelectedCollisions const&){
+  void processNoVZeros(SelectedCollisions const&)
+  {
     // dummy
   }
 
   PROCESS_SWITCH(HfTrackIndexSkimCreatorVZero, processNoVZeros, "Do not do v0", true);
 
   void processVZeros(SelectedCollisions::iterator const& collision,
-                    aod::BCsWithTimestamps const&,
-                    // soa::Filtered<aod::V0Datas> const& V0s,
-                    aod::V0Datas const& V0s,
-                    MyTracks const& tracks
+                     aod::BCsWithTimestamps const&,
+                     // soa::Filtered<aod::V0Datas> const& V0s,
+                     aod::V0Datas const& V0s,
+                     MyTracks const& tracks
 #ifdef MY_DEBUG
-                    ,
-                    aod::McParticles& mcParticles
+                     ,
+                     aod::McParticles& mcParticles
 #endif
-                    ) // TODO: I am now assuming that the V0s are already filtered with my cuts (David's work to come)
+                     ) // TODO: I am now assuming that the V0s are already filtered with my cuts (David's work to come)
   {
 
     // set the magnetic field from CCDB
@@ -2640,18 +2641,19 @@ struct HfTrackIndexSkimCreatorCascades {
     return true;
   }
 
-  void processNoCascades(SelectedCollisions const&){
+  void processNoCascades(SelectedCollisions const&)
+  {
     // dummy
   }
 
   PROCESS_SWITCH(HfTrackIndexSkimCreatorCascades, processNoCascades, "Do not do cascade", true);
 
   void processCascases(SelectedCollisions::iterator const& collision,
-               aod::BCs const& bcs,
-               aod::V0sLinked const&,
-               V0full const&,
-               SelectedCascades const& cascades,
-               SelectedTracks const& tracks)
+                       aod::BCs const& bcs,
+                       aod::V0sLinked const&,
+                       V0full const&,
+                       SelectedCascades const& cascades,
+                       SelectedTracks const& tracks)
   {
     // set the magnetic field from CCDB
     auto bc = collision.bc_as<o2::aod::BCsWithTimestamps>();
