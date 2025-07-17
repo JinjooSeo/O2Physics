@@ -21,15 +21,16 @@
 
 #include <map>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 // Fill the map of available input features
 // the key is the feature's name (std::string)
 // the value is the corresponding value in EnumInputFeatures
-#define FILL_MAP(FEATURE) \
-  {                       \
-    #FEATURE, static_cast<uint8_t>(InputFeatures::FEATURE)}
+#define FILL_MAP(FEATURE)                                  \
+  {                                                        \
+    #FEATURE, static_cast<uint8_t>(InputFeatures::FEATURE) \
+  }
 
 namespace o2::analysis
 {
