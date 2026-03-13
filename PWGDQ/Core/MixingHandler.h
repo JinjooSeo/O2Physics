@@ -63,4 +63,9 @@ class MixingHandler : public TNamed
   ClassDef(MixingHandler, 1);
 };
 
+namespace o2::aod::dqmixing
+{
+void AddMixingVariables(MixingHandler* mh, const char* mixingVariables, const char* json = "");
+}
+
 #endif // PWGDQ_CORE_MIXINGHANDLER_H_

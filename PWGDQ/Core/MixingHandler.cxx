@@ -10,10 +10,18 @@
 // or submit itself to any jurisdiction.
 
 #include "PWGDQ/Core/MixingHandler.h"
+#include "PWGDQ/Core/MixingLibrary.h"
 #include "PWGDQ/Core/VarManager.h"
 
+#include <TObjArray.h>
+
+#include "rapidjson/document.h"
+#include "rapidjson/error/en.h"
+
+#include <cstring>
 #include <iostream>
 #include <fstream>
+#include <memory>
 using namespace std;
 
 #include <TMath.h>
@@ -21,6 +29,167 @@ using namespace std;
 #include <TRandom.h>
 
 ClassImp(MixingHandler);
+
+namespace
+{
+int getVariableFromName(TString variableName)
+{
+  variableName = variableName.Strip(TString::kBoth, ' ');
+  if (variableName.IsNull()) {
+    return VarManager::kNothing;
+  }
+
+  if (VarManager::fgVarNamesMap.empty()) {
+    VarManager::SetDefaultVarNames();
+  }
+
+  auto variable = VarManager::fgVarNamesMap.find(variableName);
+  if (variable != VarManager::fgVarNamesMap.end()) {
+    return variable->second;
+  }
+
+  if (!variableName.BeginsWith("k")) {
+    TString prefixedName = Form("k%s", variableName.Data());
+    variable = VarManager::fgVarNamesMap.find(prefixedName);
+    if (variable != VarManager::fgVarNamesMap.end()) {
+      return variable->second;
+    }
+  }
+
+  return VarManager::kNothing;
+}
+
+int inferVariableFromMixingName(TString mixingName)
+{
+  mixingName = mixingName.Strip(TString::kBoth, ' ');
+  if (mixingName.BeginsWith("CentralityFT0C")) {
+    return VarManager::kCentFT0C;
+  }
+  if (mixingName.BeginsWith("Centrality")) {
+    return VarManager::kCentVZERO;
+  }
+  if (mixingName.BeginsWith("Mult")) {
+    return VarManager::kVtxNcontrib;
+  }
+  if (mixingName.BeginsWith("Vtx")) {
+    return VarManager::kVtxZ;
+  }
+  if (mixingName.BeginsWith("Occupancy")) {
+    return VarManager::kTrackOccupancyInTimeRange;
+  }
+  if (mixingName.BeginsWith("Psi2A")) {
+    return VarManager::kPsi2A;
+  }
+  if (mixingName.BeginsWith("Psi2B")) {
+    return VarManager::kPsi2B;
+  }
+  if (mixingName.BeginsWith("Psi2C")) {
+    return VarManager::kPsi2C;
+  }
+  if (mixingName.BeginsWith("MedianTimeA")) {
+    return VarManager::kNTPCmedianTimeLongA;
+  }
+  if (mixingName.BeginsWith("PileUpA")) {
+    return VarManager::kNTPCcontribLongA;
+  }
+  return VarManager::kNothing;
+}
+
+bool validateBinLimits(const rapidjson::Value& binLimits, const char* mixingName)
+{
+  if (!binLimits.IsArray()) {
+    LOG(fatal) << "Mixing definition " << mixingName << " must provide bin limits as an array";
+    return false;
+  }
+  if (binLimits.GetArray().Size() < 2) {
+    LOG(fatal) << "Mixing definition " << mixingName << " must provide at least two bin edges";
+    return false;
+  }
+
+  double previousEdge = 0.0;
+  bool firstEdge = true;
+  for (const auto& edge : binLimits.GetArray()) {
+    if (!edge.IsNumber()) {
+      LOG(fatal) << "Mixing definition " << mixingName << " contains a non-numeric bin edge";
+      return false;
+    }
+    double currentEdge = edge.GetDouble();
+    if (!firstEdge && currentEdge <= previousEdge) {
+      LOG(fatal) << "Mixing definition " << mixingName << " must provide strictly increasing bin edges";
+      return false;
+    }
+    previousEdge = currentEdge;
+    firstEdge = false;
+  }
+
+  return true;
+}
+
+int getJSONMixingVariable(const rapidjson::Value& mixing, const char* mixingName)
+{
+  if (mixing.IsObject() && mixing.HasMember("var")) {
+    const auto& varField = mixing.FindMember("var")->value;
+    if (!varField.IsString()) {
+      LOG(fatal) << "Mixing definition " << mixingName << " has a non-string var field";
+      return VarManager::kNothing;
+    }
+    int variable = getVariableFromName(varField.GetString());
+    if (variable == VarManager::kNothing) {
+      LOG(fatal) << "Mixing definition " << mixingName << " uses an unknown variable " << varField.GetString();
+      return VarManager::kNothing;
+    }
+    return variable;
+  }
+
+  int inferredVariable = inferVariableFromMixingName(mixingName);
+  if (inferredVariable == VarManager::kNothing) {
+    LOG(fatal) << "Mixing definition " << mixingName << " must specify a valid var field";
+  }
+  return inferredVariable;
+}
+
+bool validateJSONMixingDefinition(const rapidjson::Value& mixing, const char* mixingName)
+{
+  if (mixing.IsArray()) {
+    if (inferVariableFromMixingName(mixingName) == VarManager::kNothing) {
+      LOG(fatal) << "Cannot infer the variable for mixing definition " << mixingName << "; please specify var explicitly";
+      return false;
+    }
+    return validateBinLimits(mixing, mixingName);
+  }
+
+  if (!mixing.IsObject()) {
+    LOG(fatal) << "Mixing definition " << mixingName << " must be an object or an array of bin edges";
+    return false;
+  }
+
+  if (!mixing.HasMember("binLimits")) {
+    LOG(fatal) << "Mixing definition " << mixingName << " is missing the binLimits field";
+    return false;
+  }
+
+  (void)getJSONMixingVariable(mixing, mixingName);
+  return validateBinLimits(mixing.FindMember("binLimits")->value, mixingName);
+}
+
+bool addJSONMixingVariable(MixingHandler* mh, const rapidjson::Value& mixing, const char* mixingName)
+{
+  if (!validateJSONMixingDefinition(mixing, mixingName)) {
+    return false;
+  }
+
+  int variable = getJSONMixingVariable(mixing, mixingName);
+  const auto& binLimitsJSON = mixing.IsArray() ? mixing : mixing.FindMember("binLimits")->value;
+  std::vector<float> binLimits;
+  binLimits.reserve(binLimitsJSON.GetArray().Size());
+  for (const auto& edge : binLimitsJSON.GetArray()) {
+    binLimits.push_back(static_cast<float>(edge.GetDouble()));
+  }
+
+  mh->AddMixingVariable(variable, binLimits.size(), binLimits);
+  return true;
+}
+} // namespace
 
 //_________________________________________________________________________
 MixingHandler::MixingHandler() : TNamed(),
@@ -187,4 +356,76 @@ int MixingHandler::GetBinFromCategory(VarManager::Variables var, int category) c
   int truncatedCategory = category - (category % norm);
   truncatedCategory /= norm;
   return truncatedCategory % (fVariableLimits[tempVar].GetSize() - 1);
+}
+
+void o2::aod::dqmixing::AddMixingVariables(MixingHandler* mh, const char* mixingVariables, const char* json)
+{
+  if (!mh) {
+    LOG(fatal) << "MixingHandler pointer is null";
+    return;
+  }
+
+  TString mixVarsString = mixingVariables ? mixingVariables : "";
+  mixVarsString = mixVarsString.Strip(TString::kBoth, ' ');
+  if (mixVarsString.Length() == 0) {
+    return;
+  }
+
+  rapidjson::Document document;
+  bool hasJSONMixingDefinitions = false;
+  TString jsonString = json ? json : "";
+  jsonString = jsonString.Strip(TString::kBoth, ' ');
+  if (jsonString.Length() > 0) {
+    LOG(info) << "========================================== interpreting JSON for mixing variables";
+    LOG(info) << "      json string is: " << json;
+
+    rapidjson::ParseResult ok = document.Parse(json);
+    if (!ok) {
+      LOG(fatal) << "JSON parse error: " << rapidjson::GetParseErrorFunc(ok.Code()) << " (" << ok.Offset() << ")";
+      TString str = "";
+      for (int i = ok.Offset() - 30; i < static_cast<int>(ok.Offset()) + 50; i++) {
+        if ((i >= 0) && (i < static_cast<int>(strlen(json)))) {
+          str += json[i];
+        }
+      }
+      LOG(fatal) << "**** Parsing error is somewhere here: " << str.Data();
+      return;
+    }
+    if (!document.IsObject()) {
+      LOG(fatal) << "Mixing JSON must be a top-level object keyed by names used in cfgMixingVars";
+      return;
+    }
+    hasJSONMixingDefinitions = true;
+  }
+
+  std::unique_ptr<TObjArray> objArray(mixVarsString.Tokenize(","));
+  if (!objArray) {
+    return;
+  }
+
+  for (int iVar = 0; iVar < objArray->GetEntries(); ++iVar) {
+    TString mixingName = objArray->At(iVar)->GetName();
+    mixingName = mixingName.Strip(TString::kBoth, ' ');
+    if (mixingName.Length() == 0) {
+      continue;
+    }
+
+    int nMixingVariablesBefore = mh->GetNMixingVariables();
+    SetUpMixing(mh, mixingName.Data());
+    if (mh->GetNMixingVariables() > nMixingVariablesBefore) {
+      continue;
+    }
+
+    if (hasJSONMixingDefinitions) {
+      auto jsonMixing = document.FindMember(mixingName.Data());
+      if (jsonMixing != document.MemberEnd()) {
+        if (addJSONMixingVariable(mh, jsonMixing->value, mixingName.Data())) {
+          LOG(info) << "Configured mixing variable " << mixingName.Data() << " from JSON";
+          continue;
+        }
+      }
+    }
+
+    LOG(fatal) << "Did not find mixing configuration " << mixingName.Data() << " in MixingLibrary or cfgMixingVarsJSON";
+  }
 }

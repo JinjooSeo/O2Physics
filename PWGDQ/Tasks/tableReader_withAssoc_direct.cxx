@@ -250,6 +250,7 @@ struct AnalysisEventSelection {
   OutputObj<THashList> fOutputList{"output"};
   OutputObj<TList> fStatsList{"Statistics"};
   Configurable<std::string> fConfigMixingVariables{"cfgMixingVars", "", "Mixing configs separated by a comma, default no mixing"};
+  Configurable<std::string> fConfigMixingVariablesJSON{"cfgMixingVarsJSON", "", "Additional mixing definitions in JSON format keyed by cfgMixingVars names"};
   Configurable<std::string> fConfigEventCuts{"cfgEventCuts", "eventStandard", "Event selection"};
   Configurable<std::string> fConfigEventCutsJSON{"cfgEventCutsJSON", "", "Additional event cuts specified in JSON format"};
   Configurable<bool> fConfigQA{"cfgQA", false, "If true, fill QA histograms"};
@@ -368,13 +369,11 @@ struct AnalysisEventSelection {
     fStatsList->AddAt(histZorroSel, kStatsZorroSel);
 
     TString mixVarsString = fConfigMixingVariables.value;
-    std::unique_ptr<TObjArray> objArray(mixVarsString.Tokenize(","));
-    if (objArray->GetEntries() > 0) {
+    mixVarsString = mixVarsString.Strip(TString::kBoth, ' ');
+    if (mixVarsString.Length() > 0) {
       fMixHandler = new MixingHandler("mixingHandler", "mixing handler");
+      dqmixing::AddMixingVariables(fMixHandler, mixVarsString.Data(), fConfigMixingVariablesJSON.value.c_str());
       fMixHandler->Init();
-      for (int iVar = 0; iVar < objArray->GetEntries(); ++iVar) {
-        dqmixing::SetUpMixing(fMixHandler, objArray->At(iVar)->GetName());
-      }
     }
 
     fCurrentRun = -1;
